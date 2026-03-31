@@ -1,0 +1,11 @@
+# ==================== DEPENDENCIAS ====================
+node_modules/
+
+# ==================== CONFIGURACION ====================
+.env
+.env.local
+.env.production
+
+# ==================== SISTEMA ====================
+.DS_Store
+*.log
