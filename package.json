@@ -1,0 +1,15 @@
+{
+  "name": "pergaminos-libros-bot",
+  "version": "1.0.0",
+  "description": "Bot de Telegram para buscar libros de dominio público en Project Gutenberg",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.0",
+    "express": "^4.18.0",
+    "telegraf": "^4.16.0"
+  }
+}
