@@ -6,23 +6,167 @@ const { GUTENDEX_API_URL } = require('../config');
 const TIMEOUT_MS = 15000;
 const MAX_RESULTADOS = 5;
 
-console.log('🔌 Módulo gutendex.js cargado (FASE 2 - Implementación real)');
+console.log('🔌 Módulo gutendex.js cargado (FASE 2.1 - Búsqueda inteligente)');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
 console.log(`   📊 Límite: ${MAX_RESULTADOS} resultados`);
 
+// ==================== DICCIONARIO_CORRECCIONES ====================
+const CORRECCIONES = {
+    // Errores comunes de tipeo
+    "frankestein": "frankenstein",
+    "frankestein": "frankenstein",
+    "quijote": "quijote",
+    "don quijote": "don quijote de la mancha",
+    "principito": "el principito",
+    "cien años": "cien años de soledad",
+    "100 años": "cien años de soledad",
+    "harry potter": "harry potter",
+    "sherlock holmes": "sherlock holmes",
+    "sherlock": "sherlock holmes",
+    "moby dick": "moby dick",
+    "moby": "moby dick",
+    // Clásicos españoles
+    "la celestina": "la celestina",
+    "celestina": "la celestina",
+    "lazarillo": "lazarillo de tormes",
+    "el lazarillo": "lazarillo de tormes",
+    "poema del mío cid": "el cantar de mío cid",
+    "el cid": "el cantar de mío cid",
+    "rinconete": "rinconete y cortadillo",
+    "cortadillo": "rinconete y cortadillo"
+};
+
+// ==================== PALABRAS_VACIAS ====================
+const PALABRAS_VACIAS = [
+    'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
+    'de', 'del', 'en', 'por', 'para', 'con', 'sin', 'sobre',
+    'libro', 'autor', 'escribio', 'escribió', 'escrito', 'escritor',
+    'buscar', 'busca', 'buscando', 'de', 'y', 'o', 'pero', 'que',
+    'cual', 'como', 'cuando', 'donde', 'porque', 'aunque', 'mientras'
+];
+
+// ==================== FUNCION_NORMALIZAR_CONSULTA ====================
+/**
+ * Normaliza la consulta: elimina palabras vacías, corrige errores, limpia puntuación
+ * @param {string} query - Consulta original
+ * @returns {Object} { original, limpia, corregida, modificada }
+ */
+function normalizarConsulta(query) {
+    const original = query.trim();
+    console.log(`🔧 Normalizando consulta: "${original}"`);
+    
+    // Paso 1: Minúsculas
+    let texto = original.toLowerCase();
+    
+    // Paso 2: Eliminar signos de puntuación excepto espacios y letras
+    texto = texto.replace(/[^\p{L}\p{N}\s]/gu, ' ');
+    
+    // Paso 3: Eliminar palabras vacías
+    let palabras = texto.split(/\s+/).filter(p => !PALABRAS_VACIAS.includes(p));
+    let limpia = palabras.join(' ').trim();
+    
+    // Paso 4: Corregir errores ortográficos (aplicar en orden)
+    let corregida = limpia;
+    for (const [error, correccion] of Object.entries(CORRECCIONES)) {
+        if (corregida.includes(error)) {
+            console.log(`   ✏️ Corrigiendo: "${error}" → "${corregida.replace(error, correccion)}"`);
+            corregida = corregida.replace(error, correccion);
+        }
+    }
+    
+    // Si después de limpiar quedó vacío, devolver original limpio de puntuación
+    if (limpia === '') {
+        limpia = texto.replace(/[^\p{L}\p{N}]/gu, ' ').trim();
+        corregida = limpia;
+    }
+    
+    const modificada = (limpia !== original.toLowerCase() && limpia !== '') || corregida !== limpia;
+    
+    console.log(`   📝 Resultado: limpia="${limpia}", corregida="${corregida}", modificada=${modificada}`);
+    
+    return {
+        original,
+        limpia,
+        corregida,
+        modificada
+    };
+}
+
+// ==================== FUNCION_DETECTAR_TIPO_CONSULTA ====================
+/**
+ * Detecta si la consulta es probablemente un autor o un título
+ * @param {string} query - Consulta limpia
+ * @returns {string} 'autor' o 'titulo'
+ */
+function detectarTipoConsulta(query) {
+    console.log(`🔍 Detectando tipo de consulta: "${query}"`);
+    
+    // Palabras clave que indican búsqueda por autor
+    const palabrasAutor = ['by', 'por', 'de', 'del', 'escrito', 'author', 'autor'];
+    const tienePalabraAutor = palabrasAutor.some(p => query.toLowerCase().includes(p));
+    
+    if (tienePalabraAutor) {
+        console.log(`   ✅ Detectado como AUTOR (palabra clave)`);
+        return 'autor';
+    }
+    
+    // Patrón: nombre y apellido (dos palabras con mayúscula en cada una)
+    // En texto ya está en minúsculas, pero podemos detectar por longitud y estructura
+    const palabras = query.split(/\s+/);
+    
+    // Nombres de autores conocidos (para casos especiales)
+    const autoresConocidos = [
+        'mary shelley', 'jane austen', 'charles dickens', 'mark twain',
+        'jules verne', 'gabriel garcía márquez', 'miguel de cervantes',
+        'franz kafka', 'edgar allan poe', 'oscar wilde', 'lewis carroll'
+    ];
+    
+    const esAutorConocido = autoresConocidos.some(autor => 
+        query.toLowerCase().includes(autor)
+    );
+    
+    if (esAutorConocido) {
+        console.log(`   ✅ Detectado como AUTOR (autor conocido)`);
+        return 'autor';
+    }
+    
+    // Si tiene 2-3 palabras y ninguna es artículo muy común, puede ser nombre
+    if (palabras.length >= 2 && palabras.length <= 4) {
+        // Si todas las palabras tienen más de 3 letras, probablemente nombre
+        const todasLargas = palabras.every(p => p.length > 3);
+        if (todasLargas) {
+            console.log(`   ✅ Detectado como AUTOR (patrón nombre/apellido)`);
+            return 'autor';
+        }
+    }
+    
+    console.log(`   ✅ Detectado como TITULO (default)`);
+    return 'titulo';
+}
+
 // ==================== FUNCION_BUSCAR_LIBROS ====================
 /**
- * Busca libros en Gutendex por título
- * @param {string} query - Título a buscar
+ * Busca libros en Gutendex con soporte para título/autor
+ * @param {string} query - Término de búsqueda
  * @param {string} idioma - Código de idioma (es, en)
+ * @param {string} tipo - 'titulo' o 'autor'
  * @returns {Promise<Array>} Lista de libros encontrados
  */
-async function buscarLibros(query, idioma = 'es') {
-    console.log(`📡 Iniciando búsqueda en Gutendex: "${query}" (idioma: ${idioma})`);
+async function buscarLibros(query, idioma = 'es', tipo = 'titulo') {
+    console.log(`📡 Buscando en Gutendex: "${query}" (idioma: ${idioma}, tipo: ${tipo})`);
     
     try {
-        // Construir URL con parámetros
-        const url = `${GUTENDEX_API_URL}/?search=${encodeURIComponent(query)}&languages=${idioma}`;
+        // Construir URL según tipo de búsqueda
+        let url = `${GUTENDEX_API_URL}/?languages=${idioma}`;
+        
+        if (tipo === 'autor') {
+            url += `&search_author=${encodeURIComponent(query)}`;
+            console.log(`   👤 Búsqueda por autor: "${query}"`);
+        } else {
+            url += `&search=${encodeURIComponent(query)}`;
+            console.log(`   📖 Búsqueda por título: "${query}"`);
+        }
+        
         console.log(`📍 URL: ${url}`);
         
         const response = await axios.get(url, {
@@ -44,30 +188,28 @@ async function buscarLibros(query, idioma = 'es') {
         
         // Procesar cada libro
         const librosProcesados = librosRaw.map(libro => {
-            const { id, title, authors, subjects, download_count, formats } = libro;
+            const { id, title, authors, languages, formats } = libro;
             
             // Extraer autor
             const autor = authors && authors.length > 0 
                 ? authors[0].name 
                 : 'Autor desconocido';
             
-            // Extraer año (intentar desde subjects, download_count, o dejar como string)
-            let anio = 'Año desconocido';
-            if (subjects && subjects.length > 0) {
-                const anioMatch = subjects[0].match(/\b(1[0-9]{3}|20[0-2][0-9])\b/);
-                if (anioMatch) anio = anioMatch[0];
-            }
+            // Extraer idioma (primer idioma de la lista)
+            const idiomaLibro = languages && languages.length > 0 
+                ? languages[0] 
+                : 'desconocido';
             
             // Extraer enlaces
             const { enlaceHTML, enlaceEPUB } = extraerEnlaces(formats);
             
-            console.log(`   📖 Procesado: "${title}" (ID: ${id}) - HTML: ${!!enlaceHTML}, EPUB: ${!!enlaceEPUB}`);
+            console.log(`   📖 Procesado: "${title}" (ID: ${id}) - Idioma: ${idiomaLibro}, HTML: ${!!enlaceHTML}, EPUB: ${!!enlaceEPUB}`);
             
             return {
                 id,
                 titulo: title,
                 autor,
-                anio,
+                idioma: idiomaLibro,
                 enlaceHTML,
                 enlaceEPUB
             };
@@ -123,5 +265,7 @@ function extraerEnlaces(formats) {
 
 // ==================== EXPORTS ====================
 module.exports = {
-    buscarLibros
+    buscarLibros,
+    normalizarConsulta,
+    detectarTipoConsulta
 };
