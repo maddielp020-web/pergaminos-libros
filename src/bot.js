@@ -26,6 +26,9 @@ bot.command('start', async (ctx) => {
 });
 
 // ==================== HANDLER_BUSCAR ====================
+const { buscarLibros } = require('./buscar/gutendex');
+const { formatearResultados } = require('./mensajes/formatear');
+
 bot.command('buscar', async (ctx) => {
     console.log(`🔍 Comando /buscar recibido de: ${ctx.from.id}`);
     
@@ -47,18 +50,64 @@ bot.command('buscar', async (ctx) => {
     
     console.log(`📖 Búsqueda solicitada: "${query}" (usuario: ${ctx.from.id})`);
     
-    // TEMPORAL: Respuesta sin búsqueda real
-    // FASE 2: Conectar con gutendex.js
-    await ctx.reply(
-        `🔍 *Buscando:* "${query}"\n\n` +
-        '⏳ *FASE 1 - Funcionalidad temporal*\n' +
-        'Esta es una respuesta de prueba. En la próxima fase, ' +
-        'conectaré con Project Gutenberg para mostrar resultados reales.\n\n' +
-        '✅ El bot funciona correctamente. Espera la siguiente orden operativa.',
+    // Enviar mensaje de espera
+    const mensajeEspera = await ctx.reply(
+        `🔍 *Buscando* "${query}"...\n\n` +
+        `⏳ Consultando Project Gutenberg...`,
         { parse_mode: 'Markdown' }
     );
     
-    console.log(`✅ Respuesta temporal enviada para: "${query}"`);
+    try {
+        // Buscar en español primero
+        console.log(`🌎 Buscando en español: "${query}"`);
+        let libros = await buscarLibros(query, 'es');
+        
+        // Si no hay resultados, buscar en inglés
+        if (libros.length === 0) {
+            console.log(`⚠️ Sin resultados en español, buscando en inglés: "${query}"`);
+            await ctx.telegram.editMessageText(
+                ctx.chat.id,
+                mensajeEspera.message_id,
+                null,
+                `🔍 *Buscando* "${query}"...\n\n` +
+                `⏳ Sin resultados en español. Probando en inglés...`,
+                { parse_mode: 'Markdown' }
+            );
+            libros = await buscarLibros(query, 'en');
+        }
+        
+        // Formatear resultados
+        const mensajeResultado = formatearResultados(libros, query);
+        
+        // Editar mensaje de espera con resultados
+        await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            mensajeEspera.message_id,
+            null,
+            mensajeResultado,
+            { parse_mode: 'Markdown', disable_web_page_preview: true }
+        );
+        
+        console.log(`✅ Resultados enviados para: "${query}" (${libros.length} libros)`);
+        
+    } catch (error) {
+        console.error(`❌ Error en búsqueda de "${query}":`, error.message);
+        
+        // Mensaje de error amigable
+        await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            mensajeEspera.message_id,
+            null,
+            `❌ *Error en la búsqueda*\n\n` +
+            `No pude consultar Project Gutenberg en este momento.\n\n` +
+            `💡 *Sugerencias:*\n` +
+            `• Intenta de nuevo en unos segundos\n` +
+            `• Prueba con otro término de búsqueda\n` +
+            `• Si el error persiste, avisa al administrador\n\n` +
+            `🔍 *Buscabas:* "${query}"`,
+            { parse_mode: 'Markdown' }
+        );
+    }
 });
 
 // ==================== HANDLER_HELP ====================
