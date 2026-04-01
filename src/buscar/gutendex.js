@@ -230,6 +230,47 @@ async function buscarLibros(query, idioma = 'es', tipo = 'titulo') {
     }
 }
 
+// ==================== FUNCION_FORMATEAR_AUTOR ====================
+/**
+ * Convierte "Nombre Apellido" a "Apellido, Nombre" para búsqueda en Gutendex
+ * @param {string} nombre - Nombre completo del autor
+ * @returns {string} Nombre formateado para búsqueda
+ */
+function formatearNombreAutor(nombre) {
+    const partes = nombre.trim().split(/\s+/);
+    if (partes.length >= 2) {
+        const apellido = partes[partes.length - 1];
+        const nombres = partes.slice(0, -1).join(' ');
+        return `${apellido}, ${nombres}`;
+    }
+    return nombre;
+}
+
+// ==================== FUNCION_BUSCAR_POR_AUTOR_CON_FALLBACK ====================
+/**
+ * Busca libros por autor con fallback a formato "Apellido, Nombre"
+ * @param {string} autor - Nombre del autor
+ * @param {string} idioma - Código de idioma
+ * @returns {Promise<Array>} Lista de libros encontrados
+ */
+async function buscarPorAutorConFallback(autor, idioma = 'es') {
+    console.log(`🔍 Buscando por autor con fallback: "${autor}"`);
+    
+    // Primer intento: con el nombre original
+    let libros = await buscarLibros(autor, idioma, 'autor');
+    
+    // Si no hay resultados, intentar con formato "Apellido, Nombre"
+    if (libros.length === 0) {
+        const autorFormateado = formatearNombreAutor(autor);
+        if (autorFormateado !== autor) {
+            console.log(`🔄 Intentando con formato alternativo: "${autorFormateado}"`);
+            libros = await buscarLibros(autorFormateado, idioma, 'autor');
+        }
+    }
+    
+    return libros;
+}
+
 // ==================== FUNCION_EXTRAER_ENLACES ====================
 /**
  * Extrae enlaces HTML y EPUB de los formats de Gutendex
@@ -266,6 +307,8 @@ function extraerEnlaces(formats) {
 // ==================== EXPORTS ====================
 module.exports = {
     buscarLibros,
+    buscarPorAutorConFallback,
     normalizarConsulta,
-    detectarTipoConsulta
+    detectarTipoConsulta,
+    formatearNombreAutor
 };
