@@ -26,7 +26,7 @@ bot.command('start', async (ctx) => {
 });
 
 // ==================== HANDLER_BUSCAR ====================
-const { buscarLibros } = require('./buscar/gutendex');
+const { buscarLibros, normalizarConsulta, detectarTipoConsulta } = require('./buscar/gutendex');
 const { formatearResultados } = require('./mensajes/formatear');
 
 bot.command('buscar', async (ctx) => {
@@ -40,9 +40,12 @@ bot.command('buscar', async (ctx) => {
         console.log(`⚠️ Búsqueda vacía de: ${ctx.from.id}`);
         await ctx.reply(
             '❓ *¿Qué libro buscas?*\n\n' +
-            'Usa el comando seguido del título:\n' +
-            '`/buscar El Quijote`\n\n' +
-            'O si prefieres, envía directamente el nombre del libro.',
+            'Usa el comando seguido del título o autor:\n' +
+            '`/buscar Frankenstein`\n' +
+            '`/buscar Mary Shelley`\n\n' +
+            'También puedes buscar frases:\n' +
+            '`/buscar el libro de Frankenstein`\n\n' +
+            '💡 *Consejo:* El bot corrige errores comunes y elimina palabras vacías automáticamente.',
             { parse_mode: 'Markdown' }
         );
         return;
@@ -50,61 +53,125 @@ bot.command('buscar', async (ctx) => {
     
     console.log(`📖 Búsqueda solicitada: "${query}" (usuario: ${ctx.from.id})`);
     
+    // Normalizar consulta
+    const normalizada = normalizarConsulta(query);
+    const consultaBase = normalizada.corregida || normalizada.limpia;
+    
+    // Si la consulta corregida está vacía, usar la original limpia
+    const consultaFinal = consultaBase !== '' ? consultaBase : normalizada.limpia;
+    
+    console.log(`🔧 Consulta normalizada: "${normalizada.original}" → "${consultaFinal}"`);
+    
     // Enviar mensaje de espera
-    const mensajeEspera = await ctx.reply(
-        `🔍 *Buscando* "${query}"...\n\n` +
-        `⏳ Consultando Project Gutenberg...`,
-        { parse_mode: 'Markdown' }
-    );
+    let mensajeEsperaTexto = `🔍 *Buscando* "${query}"...\n\n`;
+    
+    if (normalizada.modificada && consultaFinal !== normalizada.original) {
+        mensajeEsperaTexto += `📝 *Corrigiendo:* "${normalizada.original}" → "${consultaFinal}"\n`;
+    }
+    
+    mensajeEsperaTexto += `⏳ Consultando Project Gutenberg...`;
+    
+    const mensajeEspera = await ctx.reply(mensajeEsperaTexto, { parse_mode: 'Markdown' });
     
     try {
-        // Buscar en español primero
-        console.log(`🌎 Buscando en español: "${query}"`);
-        let libros = await buscarLibros(query, 'es');
+        // Detectar tipo de consulta
+        let tipo = detectarTipoConsulta(consultaFinal);
+        console.log(`🎯 Tipo detectado: ${tipo}`);
         
-        // Si no hay resultados, buscar en inglés
-        if (libros.length === 0) {
-            console.log(`⚠️ Sin resultados en español, buscando en inglés: "${query}"`);
+        // PRIMER INTENTO: Con consulta limpia y tipo detectado
+        let libros = await buscarLibros(consultaFinal, 'es', tipo);
+        
+        // SEGUNDO INTENTO: Si no hay resultados y era autor, intentar como título
+        if (libros.length === 0 && tipo === 'autor') {
+            console.log(`🔄 Intentando búsqueda por título (fallback desde autor)`);
             await ctx.telegram.editMessageText(
                 ctx.chat.id,
                 mensajeEspera.message_id,
                 null,
-                `🔍 *Buscando* "${query}"...\n\n` +
-                `⏳ Sin resultados en español. Probando en inglés...`,
+                `${mensajeEsperaTexto}\n\n🔄 Sin resultados por autor. Probando por título...`,
                 { parse_mode: 'Markdown' }
             );
-            libros = await buscarLibros(query, 'en');
+            libros = await buscarLibros(consultaFinal, 'es', 'titulo');
+            tipo = 'titulo';
         }
         
-        // Formatear resultados
-        const mensajeResultado = formatearResultados(libros, query);
+        // TERCER INTENTO: Si aún no hay resultados, intentar con inglés (título)
+        if (libros.length === 0) {
+            console.log(`🌎 Intentando búsqueda en inglés (fallback)`);
+            await ctx.telegram.editMessageText(
+                ctx.chat.id,
+                mensajeEspera.message_id,
+                null,
+                `${mensajeEsperaTexto}\n\n🌎 Sin resultados en español. Probando en inglés...`,
+                { parse_mode: 'Markdown' }
+            );
+            libros = await buscarLibros(consultaFinal, 'en', 'titulo');
+        }
+        
+        // CUARTO INTENTO: Si aún no hay resultados y la consulta original era diferente, probar con la original limpia
+        if (libros.length === 0 && consultaFinal !== normalizada.limpia && normalizada.limpia !== '') {
+            console.log(`🔄 Intentando con consulta limpia original: "${normalizada.limpia}"`);
+            await ctx.telegram.editMessageText(
+                ctx.chat.id,
+                mensajeEspera.message_id,
+                null,
+                `${mensajeEsperaTexto}\n\n🔄 Probando con: "${normalizada.limpia}"...`,
+                { parse_mode: 'Markdown' }
+            );
+            libros = await buscarLibros(normalizada.limpia, 'es', 'titulo');
+        }
+        
+        // Formatear resultados con información de normalización
+        const mensajeResultado = formatearResultados(libros, query, normalizada);
+        
+        // Añadir nota de corrección si aplica
+        let mensajeFinal = mensajeResultado;
+        if (libros.length > 0 && normalizada.modificada && consultaFinal !== query) {
+            const notaCorreccion = `\n\n📝 *Nota:* Buscaste "${query}". Mostrando resultados para "${consultaFinal}".`;
+            mensajeFinal = mensajeResultado.replace(/\n\n🔗 Fuente:/, `${notaCorreccion}\n\n🔗 Fuente:`);
+        }
+        
+        // Añadir nota de tipo de búsqueda si fue por autor
+        if (libros.length > 0 && tipo === 'autor') {
+            const notaAutor = `\n\n👤 *Búsqueda por autor:* Estos son libros de "${consultaFinal}".`;
+            mensajeFinal = mensajeFinal.replace(/\n\n🔗 Fuente:/, `${notaAutor}\n\n🔗 Fuente:`);
+        }
         
         // Editar mensaje de espera con resultados
         await ctx.telegram.editMessageText(
             ctx.chat.id,
             mensajeEspera.message_id,
             null,
-            mensajeResultado,
+            mensajeFinal,
             { parse_mode: 'Markdown', disable_web_page_preview: true }
         );
         
-        console.log(`✅ Resultados enviados para: "${query}" (${libros.length} libros)`);
+        console.log(`✅ Resultados enviados para: "${query}" (${libros.length} libros, tipo: ${tipo})`);
         
     } catch (error) {
         console.error(`❌ Error en búsqueda de "${query}":`, error.message);
+        console.error(`   Stack:`, error.stack);
         
         // Mensaje de error amigable
-        await ctx.telegram.editMessageText(
-            ctx.chat.id,
-            mensajeEspera.message_id,
-            null,
-            `❌ *Error en la búsqueda*\n\n` +
+        let mensajeError = `❌ *Error en la búsqueda*\n\n` +
             `No pude consultar Project Gutenberg en este momento.\n\n` +
             `💡 *Sugerencias:*\n` +
             `• Intenta de nuevo en unos segundos\n` +
             `• Prueba con otro término de búsqueda\n` +
+            `• Verifica tu conexión a internet\n` +
             `• Si el error persiste, avisa al administrador\n\n` +
-            `🔍 *Buscabas:* "${query}"`,
+            `🔍 *Buscabas:* "${query}"`;
+        
+        // Si la consulta fue corregida, mostrar qué intentamos buscar
+        if (normalizada.modificada && consultaFinal !== query) {
+            mensajeError += `\n\n📝 *Intenté buscar:* "${consultaFinal}"`;
+        }
+        
+        await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            mensajeEspera.message_id,
+            null,
+            mensajeError,
             { parse_mode: 'Markdown' }
         );
     }
