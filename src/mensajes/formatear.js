@@ -70,8 +70,8 @@ function formatearResultados(libros, query, normalizada = null) {
         } else {
             mensaje += `💡 *Sugerencias:*\n` +
                        `• Verifica la ortografía\n` +
-                       `• Prueba con otro título\n` +
-                       `• Busca por autor si conoces el nombre\n` +
+                       `• Si buscas por autor, prueba con: /autor [nombre]\n` +
+                       `• Si buscas por título, prueba con: /titulo [título]\n` +
                        `• Prueba en inglés si es un autor clásico\n\n`;
         }
         
