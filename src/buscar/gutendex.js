@@ -135,7 +135,7 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
         let url = `${GUTENDEX_API_URL}/?languages=${idioma}`;
         
         if (tipo === 'autor') {
-            url += `&search_author=${encodeURIComponent(query)}`;
+            url += `&search=author:${encodeURIComponent(query)}`;
         } else {
             url += `&search=${encodeURIComponent(query)}`;
         }
