@@ -4,10 +4,11 @@ const { GUTENDEX_API_URL } = require('../config');
 
 // ==================== CONFIGURACION ====================
 const TIMEOUT_MS = 15000;
-const MAX_RESULTADOS = 20; // Aumentado para mostrar todos, pero sin forzar límite inferior
+const MAX_RESULTADOS = 20;
 
-console.log('🔌 Módulo gutendex.js cargado (FASE 3 - Almacén + normalización)');
+console.log('🔌 Módulo gutendex.js cargado (FASE CORREGIDA - Parámetro oficial "search=author:")');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
+console.log(`   📡 API: ${GUTENDEX_API_URL}`);
 
 // ==================== DICCIONARIO_CORRECCIONES ====================
 const CORRECCIONES = {
@@ -54,21 +55,13 @@ function normalizarConsulta(query) {
 }
 
 // ==================== FUNCION_NORMALIZAR_TITULO ====================
-/**
- * Normaliza título para deduplicación: elimina subtítulos, artículos, puntuación
- * @param {string} titulo - Título original
- * @returns {string} Título normalizado
- */
 function normalizarTitulo(titulo) {
     if (!titulo) return '';
     
     let normalizado = titulo.toLowerCase();
-    
-    // Eliminar subtítulos (todo después de ; o :)
     normalizado = normalizado.split(';')[0];
     normalizado = normalizado.split(':')[0];
     
-    // Eliminar artículos iniciales
     const articulos = ['the ', 'a ', 'an ', 'el ', 'la ', 'los ', 'las ', 'un ', 'una '];
     for (const art of articulos) {
         if (normalizado.startsWith(art)) {
@@ -77,127 +70,10 @@ function normalizarTitulo(titulo) {
         }
     }
     
-    // Eliminar puntuación
     normalizado = normalizado.replace(/[^\p{L}\p{N}\s]/gu, '');
-    // Eliminar espacios extras
     normalizado = normalizado.trim().replace(/\s+/g, ' ');
     
     return normalizado;
-}
-
-// ==================== FUNCION_BUSCAR_POR_AUTOR ====================
-/**
- * Busca libros por autor con fallback a formato "Apellido, Nombre"
- * @param {string} autor - Nombre del autor
- * @param {string} idioma - Código de idioma
- * @returns {Promise<Array>} Lista de libros
- */
-async function buscarPorAutor(autor, idioma = 'es') {
-    console.log(`👤 Buscando por autor: "${autor}" (idioma: ${idioma})`);
-    
-    const intentos = [autor];
-    
-    // Intentar formato "Apellido, Nombre" si el original tiene espacios
-    if (autor.includes(' ') && !autor.includes(',')) {
-        const partes = autor.split(' ');
-        const apellido = partes[partes.length - 1];
-        const nombres = partes.slice(0, -1).join(' ');
-        intentos.push(`${apellido}, ${nombres}`);
-    }
-    
-    for (const intento of intentos) {
-        console.log(`   🔍 Intentando: "${intento}"`);
-        const libros = await buscarLibrosEnGutendex(intento, idioma, 'autor');
-        if (libros.length > 0) {
-            console.log(`✅ Encontrados ${libros.length} libros para "${intento}"`);
-            return libros;
-        }
-    }
-    
-    return [];
-}
-
-// ==================== FUNCION_BUSCAR_POR_TITULO ====================
-/**
- * Busca libros por título
- * @param {string} titulo - Título del libro
- * @param {string} idioma - Código de idioma
- * @returns {Promise<Array>} Lista de libros
- */
-async function buscarPorTitulo(titulo, idioma = 'es') {
-    console.log(`📖 Buscando por título: "${titulo}" (idioma: ${idioma})`);
-    return await buscarLibrosEnGutendex(titulo, idioma, 'titulo');
-}
-
-// ==================== FUNCION_BUSCAR_EN_GUTENDEX ====================
-async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
-    try {
-        let url = `${GUTENDEX_API_URL}/?languages=${idioma}`;
-        
-        if (tipo === 'autor') {
-            url += `&search=author:${encodeURIComponent(query)}`;
-        } else {
-            url += `&search=${encodeURIComponent(query)}`;
-        }
-        
-        console.log(`📍 URL: ${url}`);
-        
-        const response = await axios.get(url, {
-            timeout: TIMEOUT_MS,
-            headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
-        });
-        
-        if (!response.data || !response.data.results) {
-            return [];
-        }
-        
-        // Mostrar TODOS los resultados, sin forzar límite
-        const librosRaw = response.data.results;
-        console.log(`📚 Encontrados ${librosRaw.length} libros en Gutendex`);
-        
-        const librosProcesados = librosRaw.map(libro => {
-            const { id, title, authors, languages, formats } = libro;
-            
-            const autor = authors && authors.length > 0 
-                ? authors[0].name 
-                : 'Autor desconocido';
-            
-            const idiomaLibro = languages && languages.length > 0 
-                ? languages[0] 
-                : 'desconocido';
-            
-            // Extraer año del libro (desde texto o metadata)
-            let anio = null;
-            if (libro.subjects) {
-                const anioMatch = libro.subjects.join(' ').match(/\b(1[0-9]{3}|20[0-2][0-9])\b/);
-                if (anioMatch) anio = parseInt(anioMatch[0]);
-            }
-            
-            const { enlaceHTML, enlaceEPUB } = extraerEnlaces(formats);
-            
-            return {
-                id,
-                titulo: title,
-                autor,
-                idioma: idiomaLibro,
-                anio,
-                enlaceHTML,
-                enlaceEPUB
-            };
-        });
-        
-        return librosProcesados;
-        
-    } catch (error) {
-        if (error.code === 'ECONNABORTED') {
-            console.error(`⏰ Timeout en búsqueda: "${query}"`);
-        } else if (error.response) {
-            console.error(`❌ Error Gutendex: ${error.response.status}`);
-        } else {
-            console.error(`❌ Error: ${error.message}`);
-        }
-        throw new Error('Gutendex no disponible');
-    }
 }
 
 // ==================== FUNCION_EXTRAER_ENLACES ====================
@@ -217,6 +93,178 @@ function extraerEnlaces(formats) {
     }
     
     return { enlaceHTML, enlaceEPUB };
+}
+
+// ==================== FUNCION_BUSCAR_EN_GUTENDEX ====================
+/**
+ * Busca libros en Gutendex usando parámetros oficiales
+ * @param {string} query - Término de búsqueda
+ * @param {string} idioma - Código de idioma (es, en)
+ * @param {string} tipo - 'titulo' o 'autor'
+ * @returns {Promise<Array>} Lista de libros
+ */
+async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
+    try {
+        let url = `${GUTENDEX_API_URL}/?languages=${idioma}`;
+        
+        if (tipo === 'autor') {
+            // PARÁMETRO OFICIAL: search=author:Nombre
+            url += `&search=author:${encodeURIComponent(query)}`;
+            console.log(`   👤 URL autor (oficial): ${url}`);
+        } else {
+            url += `&search=${encodeURIComponent(query)}`;
+            console.log(`   📖 URL título: ${url}`);
+        }
+        
+        const response = await axios.get(url, {
+            timeout: TIMEOUT_MS,
+            headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
+        });
+        
+        console.log(`   📊 Status: ${response.status}`);
+        
+        if (!response.data || !response.data.results) {
+            console.log(`   ⚠️ Sin resultados (respuesta vacía)`);
+            return [];
+        }
+        
+        const librosRaw = response.data.results;
+        console.log(`   📚 Gutendex devolvió: ${librosRaw.length} libros`);
+        
+        const librosProcesados = librosRaw.map(libro => {
+            const { id, title, authors, languages, formats, subjects } = libro;
+            
+            const autor = authors && authors.length > 0 
+                ? authors[0].name 
+                : 'Autor desconocido';
+            
+            const idiomaLibro = languages && languages.length > 0 
+                ? languages[0] 
+                : 'desconocido';
+            
+            let anio = null;
+            if (subjects) {
+                const anioMatch = subjects.join(' ').match(/\b(1[0-9]{3}|20[0-2][0-9])\b/);
+                if (anioMatch) anio = parseInt(anioMatch[0]);
+            }
+            
+            const { enlaceHTML, enlaceEPUB } = extraerEnlaces(formats);
+            
+            return {
+                id,
+                titulo: title,
+                autor,
+                idioma: idiomaLibro,
+                anio,
+                enlaceHTML,
+                enlaceEPUB
+            };
+        });
+        
+        return librosProcesados;
+        
+    } catch (error) {
+        // NO lanzar excepción - devolver array vacío para que el fallback continúe
+        if (error.code === 'ECONNABORTED') {
+            console.error(`   ⏰ TIMEOUT: "${query}" después de ${TIMEOUT_MS}ms`);
+        } else if (error.response) {
+            console.error(`   ❌ HTTP ${error.response.status}: ${error.response.statusText}`);
+        } else if (error.request) {
+            console.error(`   ❌ Sin respuesta: ${error.message}`);
+        } else {
+            console.error(`   ❌ Error: ${error.message}`);
+        }
+        return [];
+    }
+}
+
+// ==================== FUNCION_BUSCAR_POR_AUTOR ====================
+/**
+ * Busca libros por autor con fallback de formatos e idioma
+ * @param {string} autor - Nombre del autor
+ * @param {string} idioma - Código de idioma inicial
+ * @returns {Promise<Array>} Lista de libros
+ */
+async function buscarPorAutor(autor, idioma = 'es') {
+    console.log(`👤 BUSCAR POR AUTOR: "${autor}" (idioma inicial: ${idioma})`);
+    
+    // Generar todos los formatos posibles del nombre
+    const formatos = [];
+    const autorOriginal = autor.trim();
+    
+    // Formato 1: Original
+    formatos.push(autorOriginal);
+    
+    // Formato 2: "Apellido, Nombre" si tiene espacio y no tiene coma
+    if (autorOriginal.includes(' ') && !autorOriginal.includes(',')) {
+        const partes = autorOriginal.split(' ');
+        const apellido = partes[partes.length - 1];
+        const nombres = partes.slice(0, -1).join(' ');
+        formatos.push(`${apellido}, ${nombres}`);
+    }
+    
+    // Formato 3: Solo apellido (última palabra)
+    if (autorOriginal.includes(' ')) {
+        const partes = autorOriginal.split(' ');
+        formatos.push(partes[partes.length - 1]);
+    }
+    
+    // Eliminar duplicados
+    const formatosUnicos = [...new Set(formatos)];
+    console.log(`   📝 Formatos a probar: ${formatosUnicos.join(' | ')}`);
+    
+    // Probar cada formato en español
+    for (const formato of formatosUnicos) {
+        console.log(`   🔍 Español: "${formato}"`);
+        const libros = await buscarLibrosEnGutendex(formato, 'es', 'autor');
+        if (libros.length > 0) {
+            console.log(`   ✅ ENCONTRADOS ${libros.length} libros con formato "${formato}" en español`);
+            return libros;
+        }
+    }
+    
+    // Si nada funciona en español, probar en inglés con los mismos formatos
+    console.log(`   🌎 Sin resultados en español, probando en inglés...`);
+    for (const formato of formatosUnicos) {
+        console.log(`   🔍 Inglés: "${formato}"`);
+        const libros = await buscarLibrosEnGutendex(formato, 'en', 'autor');
+        if (libros.length > 0) {
+            console.log(`   ✅ ENCONTRADOS ${libros.length} libros con formato "${formato}" en inglés`);
+            return libros;
+        }
+    }
+    
+    console.log(`   ❌ No se encontraron libros para "${autor}" en ningún formato`);
+    return [];
+}
+
+// ==================== FUNCION_BUSCAR_POR_TITULO ====================
+/**
+ * Busca libros por título con fallback de idioma
+ * @param {string} titulo - Título del libro
+ * @param {string} idioma - Código de idioma inicial
+ * @returns {Promise<Array>} Lista de libros
+ */
+async function buscarPorTitulo(titulo, idioma = 'es') {
+    console.log(`📖 BUSCAR POR TÍTULO: "${titulo}" (idioma inicial: ${idioma})`);
+    
+    // Probar en español
+    let libros = await buscarLibrosEnGutendex(titulo, 'es', 'titulo');
+    if (libros.length > 0) {
+        console.log(`   ✅ ENCONTRADOS ${libros.length} libros en español`);
+        return libros;
+    }
+    
+    // Probar en inglés si español falla
+    console.log(`   🌎 Sin resultados en español, probando en inglés...`);
+    libros = await buscarLibrosEnGutendex(titulo, 'en', 'titulo');
+    if (libros.length > 0) {
+        console.log(`   ✅ ENCONTRADOS ${libros.length} libros en inglés`);
+        return libros;
+    }
+    
+    console.log(`   ❌ No se encontraron libros para "${titulo}"`);
+    return [];
 }
 
 // ==================== EXPORTS ====================
