@@ -93,8 +93,35 @@ function obtenerMensajeEspecial(query) {
     return null;
 }
 
+// ==================== FUNCION_FORMATEAR_LISTA_AUTOR ====================
+/**
+ * Formatea una lista de libros para mostrar por autor (sin paginación)
+ * @param {string} autor - Nombre del autor
+ * @param {Array} libros - Lista de libros
+ * @returns {string} Mensaje formateado
+ */
+function formatearListaAutor(autor, libros) {
+    console.log(`📝 Formateando lista de autor: "${autor}" (${libros.length} libros)`);
+    
+    if (!libros || libros.length === 0) {
+        return `📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`;
+    }
+    
+    let resultado = `📚 *${autor}* (${libros.length} libro${libros.length !== 1 ? 's' : ''})\n\n`;
+    
+    libros.forEach((libro, idx) => {
+        const anio = libro.anio ? ` (${libro.anio})` : '';
+        resultado += `${idx + 1}. *${libro.titulo}*${anio}\n`;
+    });
+    
+    resultado += `\n👉 Para ver detalles de un libro, usá: /titulo "nombre exacto del libro"`;
+    
+    return resultado;
+}
+
 // ==================== EXPORTS ====================
 module.exports = {
+    formatearListaAutor,           // NUEVA
     formatearListaAutorPaginada,
     formatearLibroUnico,
     formatearErrorGutendex,
