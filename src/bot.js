@@ -5,8 +5,6 @@ const { buscarPorAutor, buscarPorTitulo, normalizarConsulta, normalizarTitulo } 
 const { formatearListaAutor, formatearLibroUnico, formatearErrorGutendex, obtenerMensajeEspecial } = require('./mensajes/formatear');
 const { buscarPorAutor: buscarPorAutorOL, buscarPorTitulo: buscarPorTituloOL } = require('./buscar/openLibrary');
 const { guardarSesionAutor, obtenerSesionAutor, eliminarSesionAutor } = require('./almacen/sesionesAutor');
-const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
-const { formatearListaAutorPaginada } = require('./mensajes/formatear');
 const {
     obtenerLibrosPorAutor,
     obtenerLibroPorTitulo,
@@ -51,58 +49,68 @@ async function buscarAutorConAlmacen(ctx, autor, esAdmin = false) {
     console.log(`🔍 Buscando autor: "${autor}" (admin: ${esAdmin})`);
     const usuarioId = ctx.from.id;
     
-    // 1. Verificar caché local (para búsquedas completas, no paginadas)
+    // 1. Verificar caché local
     let librosCache = obtenerLibrosPorAutor(autor);
     
     if (librosCache && !esAdmin) {
-        console.log(`💾 Usando cache para autor: "${autor}"`);
-        // Guardar sesión con todos los libros del cache
+        console.log(`💾 Usando cache para autor: "${autor}" (${librosCache.length} libros)`);
+        const mensaje = formatearListaAutor(autor, librosCache);
         guardarSesionAutor(usuarioId, autor, librosCache, 0, librosCache.length);
-        
-        // Mostrar primera página (libros 0-9)
-        const primeraPagina = librosCache.slice(0, 10);
-        const mensaje = formatearListaAutorPaginada(autor, primeraPagina, 1, librosCache.length);
-        
         await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
-        await ctx.reply(`📖 Para ver más libros, escribí: /mas ${autor}`);
         return;
     }
     
-    // 2. Buscar en Open Library (primera página)
-    console.log(`📚 Buscando en Open Library: "${autor}" (página 1)`);
+    // 2. Buscar en Open Library usando buscarPorAutorOL (que existe y funciona)
+    console.log(`📚 Buscando en Open Library: "${autor}"`);
     try {
-        const { libros, totalEncontrados } = await buscarPorAutorConPaginacion(autor, 'es', 0);
+        let libros = await buscarPorAutorOL(autor, 'es');
         
         if (libros.length === 0) {
-            // Intentar en inglés
-            const { libros: librosEn, totalEncontrados: totalEn } = await buscarPorAutorConPaginacion(autor, 'en', 0);
-            if (librosEn.length === 0) {
-                await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`, { parse_mode: 'Markdown' });
-                return;
-            }
-            // Guardar TODOS los libros (habría que traerlos todos, pero por ahora solo primera página)
-            guardarSesionAutor(usuarioId, autor, librosEn, 0, totalEn);
-            const mensaje = formatearListaAutorPaginada(autor, librosEn, 1, totalEn);
+            console.log(`🌎 Buscando en Open Library (inglés): "${autor}"`);
+            libros = await buscarPorAutorOL(autor, 'en');
+        }
+        
+        if (libros.length > 0) {
+            console.log(`✅ Open Library encontró ${libros.length} libros para "${autor}"`);
+            // Guardar en caché permanente
+            guardarLibrosPorAutor(autor, libros);
+            // Guardar sesión para paginación (aunque no implementemos /mas todavía)
+            guardarSesionAutor(usuarioId, autor, libros, 0, libros.length);
+            const mensaje = formatearListaAutor(autor, libros);
             await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
-            await ctx.reply(`📖 Para ver más libros, escribí: /mas ${autor}`);
             return;
         }
         
-        // Guardar sesión con los libros de la primera página
-        // NOTA: Por ahora solo tenemos la primera página. Para la paginación completa,
-        // necesitaríamos traer todas las páginas. Por simplicidad inicial, guardamos solo
-        // la primera página y cuando pida /mas, traemos la siguiente de la API.
-        guardarSesionAutor(usuarioId, autor, libros, 0, totalEncontrados);
-        const mensaje = formatearListaAutorPaginada(autor, libros, 1, totalEncontrados);
-        await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        // 3. Fallback a Gutendex
+        console.log(`⚠️ Open Library no encontró resultados. Fallback a Gutendex: "${autor}"`);
+        const { buscarPorAutor: buscarPorAutorGUT } = require('./buscar/gutendex');
+        libros = await buscarPorAutorGUT(autor, 'es');
         
-        if (totalEncontrados > 10) {
-            await ctx.reply(`📖 Para ver más libros (${totalEncontrados - 10} restantes), escribí: /mas ${autor}`);
+        if (libros.length === 0) {
+            libros = await buscarPorAutorGUT(autor, 'en');
+        }
+        
+        if (libros.length > 0) {
+            console.log(`✅ Gutendex encontró ${libros.length} libros para "${autor}"`);
+            guardarLibrosPorAutor(autor, libros);
+            guardarSesionAutor(usuarioId, autor, libros, 0, libros.length);
+            const mensaje = formatearListaAutor(autor, libros);
+            await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
+            return;
+        }
+        
+        // 4. Sin resultados
+        const mensajeEspecial = obtenerMensajeEspecial(autor);
+        if (mensajeEspecial) {
+            await ctx.reply(mensajeEspecial, { parse_mode: 'Markdown' });
+        } else {
+            await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`, { parse_mode: 'Markdown' });
         }
         
     } catch (error) {
-        console.error(`❌ Error en Open Library: ${error.message}`);
-        await ctx.reply(`⚠️ La biblioteca no está disponible. Intentá más tarde.`, { parse_mode: 'Markdown' });
+        console.error(`❌ Error en buscarAutorConAlmacen: ${error.message}`);
+        console.error(`   Stack: ${error.stack}`);
+        await ctx.reply(`⚠️ Error al buscar "${autor}". Por favor intentá más tarde.`, { parse_mode: 'Markdown' });
     }
 }
 
