@@ -3,7 +3,7 @@ const { Telegraf } = require('telegraf');
 const { BOT_TOKEN } = require('./config');
 const { buscarPorAutor, buscarPorTitulo, normalizarConsulta, normalizarTitulo } = require('./buscar/gutendex');
 const { formatearListaAutor, formatearLibroUnico, formatearErrorGutendex, obtenerMensajeEspecial } = require('./mensajes/formatear');
-const { buscarPorAutor: buscarPorAutorOL, buscarPorTitulo: buscarPorTituloOL } = require('./buscar/openLibrary');
+const { buscarPorAutor: buscarPorAutorOL, buscarPorTitulo: buscarPorTituloOL, buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
 const { guardarSesionAutor, obtenerSesionAutor, eliminarSesionAutor } = require('./almacen/sesionesAutor');
 const {
     obtenerLibrosPorAutor,
@@ -463,7 +463,7 @@ bot.command('mas', async (ctx) => {
     const usuarioId = ctx.from.id;
     const sesion = obtenerSesionAutor(usuarioId);
     
-    // Verificar que la sesión coincida con el autor solicitado
+    // Verificar que la sesión exista y coincida con el autor solicitado
     if (!sesion || sesion.autor.toLowerCase() !== autor.toLowerCase()) {
         await ctx.reply(
             `❓ *No tengo una búsqueda activa para "${autor}"*\n\n` +
@@ -493,10 +493,15 @@ bot.command('mas', async (ctx) => {
     console.log(`📚 Cargando página ${proximaPagina + 1} para "${autor}" (offset ${offset})`);
     
     try {
+        // Usar SOLO Open Library (sin fallback a Gutendex)
         const { libros: nuevosLibros, totalEncontrados } = await buscarPorAutorConPaginacion(autor, 'es', offset);
         
         if (nuevosLibros.length === 0) {
-            await ctx.reply(`⚠️ No pude cargar más libros para "${autor}". Intentá más tarde.`, { parse_mode: 'Markdown' });
+            await ctx.reply(
+                `⚠️ No pude cargar más libros para "${autor}".\n\n` +
+                `Open Library no tiene más resultados para este autor.`,
+                { parse_mode: 'Markdown' }
+            );
             return;
         }
         
@@ -516,7 +521,12 @@ bot.command('mas', async (ctx) => {
         
     } catch (error) {
         console.error(`❌ Error en /mas: ${error.message}`);
-        await ctx.reply(`⚠️ Error al cargar más libros. Intentá de nuevo con /mas ${autor}`, { parse_mode: 'Markdown' });
+        await ctx.reply(
+            `⚠️ Error al cargar más libros.\n\n` +
+            `Open Library puede estar temporalmente no disponible.\n` +
+            `Intentá de nuevo con /mas ${autor} más tarde.`,
+            { parse_mode: 'Markdown' }
+        );
     }
 });
 
