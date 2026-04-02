@@ -44,15 +44,6 @@ function formatearListaAutorPaginada(autor, libros, paginaInicio, totalLibros) {
     return resultado;
 }
 
-// Exportar la nueva función junto con las existentes
-module.exports = {
-    formatearListaAutor,
-    formatearListaAutorPaginada,  // NUEVA
-    formatearLibroUnico,
-    formatearErrorGutendex,
-    obtenerMensajeEspecial
-};
-
 // ==================== FUNCION_FORMATEAR_LIBRO_UNICO ====================
 function formatearLibroUnico(libro, sugerirAutor = null) {
     console.log(`📝 Formateando libro único: "${libro.titulo}"`);
@@ -104,7 +95,7 @@ function obtenerMensajeEspecial(query) {
 
 // ==================== EXPORTS ====================
 module.exports = {
-    formatearListaAutor,
+    formatearListaAutorPaginada,
     formatearLibroUnico,
     formatearErrorGutendex,
     obtenerMensajeEspecial
