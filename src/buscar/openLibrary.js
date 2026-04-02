@@ -319,9 +319,10 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
     const tituloNormalizadoConsulta = normalizarTituloParaComparacion(tituloLimpio);
     
     try {
-        const url = construirURL('titulo', tituloLimpio, idioma);
-        console.log(`   📡 URL: ${url}`);
-        
+        let url = construirURL('titulo', tituloLimpio, idioma);
+url += `&public_scan_b=true`;
+console.log(`   📡 URL: ${url}`);
+
         const response = await axios.get(url, {
             timeout: TIMEOUT_MS,
             headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
@@ -393,5 +394,6 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
 // ==================== EXPORTS ====================
 module.exports = {
     buscarPorAutor,
-    buscarPorTitulo
+    buscarPorTitulo,
+    buscarPorAutorConPaginacion
 };
