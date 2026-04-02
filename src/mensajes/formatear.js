@@ -15,36 +15,43 @@ const MENSAJES_ESPECIALES = [
     }
 ];
 
-// ==================== FUNCION_FORMATEAR_LISTA_AUTOR ====================
-function formatearListaAutor(autor, libros) {
-    console.log(`📝 Formateando lista de autor: "${autor}" (${libros.length} libros)`);
+// ==================== FUNCION_FORMATEAR_LISTA_AUTOR_PAGINADA ====================
+/**
+ * Formatea una lista de libros con numeración y año (para paginación)
+ * @param {string} autor - Nombre del autor
+ * @param {Array} libros - Lista de libros (máximo 10 para una página)
+ * @param {number} paginaInicio - Número inicial para la numeración (ej: 1, 11, 21)
+ * @param {number} totalLibros - Total de libros encontrados
+ * @returns {string} Mensaje formateado
+ */
+function formatearListaAutorPaginada(autor, libros, paginaInicio, totalLibros) {
+    console.log(`📝 Formateando lista paginada: "${autor}" (${libros.length} libros, inicio #${paginaInicio})`);
     
     if (!libros || libros.length === 0) {
-        return `📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre o usá "/titulo [título]".`;
+        return `📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`;
     }
     
-    // Título con cantidad
-    let resultado = `📚 *${autor}* (${libros.length} libro${libros.length !== 1 ? 's' : ''})\n\n`;
+    let resultado = `📚 *${autor}* (${totalLibros} libro${totalLibros !== 1 ? 's' : ''})\n\n`;
     
-    // Lista compacta de libros
     libros.forEach((libro, idx) => {
+        const numero = paginaInicio + idx;
         const anio = libro.anio ? ` (${libro.anio})` : '';
-        resultado += `${idx + 1}. *${libro.titulo}*${anio}\n`;
-        
-        // Enlaces compactos
-        const enlaces = [];
-        if (libro.enlaceHTML) enlaces.push(`[Leer](${libro.enlaceHTML})`);
-        if (libro.enlaceEPUB) enlaces.push(`[EPUB](${libro.enlaceEPUB})`);
-        if (enlaces.length > 0) {
-            resultado += `   🔗 ${enlaces.join(' | ')}\n`;
-        }
-        resultado += '\n';
+        resultado += `${numero}. *${libro.titulo}*${anio}\n`;
     });
     
-    resultado += `👉 Usá /libro [número] para obtener el libro completo.`;
+    resultado += `\n👉 Para ver detalles de un libro, usá: /titulo "nombre exacto del libro"`;
     
     return resultado;
 }
+
+// Exportar la nueva función junto con las existentes
+module.exports = {
+    formatearListaAutor,
+    formatearListaAutorPaginada,  // NUEVA
+    formatearLibroUnico,
+    formatearErrorGutendex,
+    obtenerMensajeEspecial
+};
 
 // ==================== FUNCION_FORMATEAR_LIBRO_UNICO ====================
 function formatearLibroUnico(libro, sugerirAutor = null) {
