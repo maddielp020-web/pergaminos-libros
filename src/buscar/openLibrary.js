@@ -224,6 +224,80 @@ async function buscarPorAutor(autor, idioma = 'es') {
     }
 }
 
+// ==================== FUNCION_BUSCAR_POR_AUTOR_CON_PAGINACION ====================
+/**
+ * Busca libros por autor en Open Library con paginación
+ * @param {string} autor - Nombre del autor
+ * @param {string} idioma - 'es' o 'en'
+ * @param {number} offset - Desplazamiento para paginación (0, 10, 20...)
+ * @returns {Promise<Object>} { libros, totalEncontrados }
+ */
+async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
+    console.log(`👤 [Open Library] Buscando autor: "${autor}" (idioma: ${idioma}, offset: ${offset})`);
+    
+    const validacion = validarConsulta(autor, 'autor');
+    if (!validacion.valida) {
+        return { libros: [], totalEncontrados: 0 };
+    }
+    
+    const autorLimpio = validacion.consultaLimpia;
+    const limite = 10; // Fijo para paginación
+    
+    try {
+        let url = `https://openlibrary.org/search.json?author=${encodeURIComponent(autorLimpio)}`;
+        url += `&lang=${idioma === 'es' ? 'spa' : 'eng'}`;
+        url += `&public_scan_b=true`;  // Solo dominio público
+        url += `&limit=${limite}`;
+        url += `&offset=${offset}`;
+        
+        console.log(`   📡 URL: ${url}`);
+        
+        const response = await axios.get(url, {
+            timeout: TIMEOUT_MS,
+            headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
+        });
+        
+        if (!response.data || !response.data.docs || response.data.docs.length === 0) {
+            console.log(`   ⚠️ Sin resultados en Open Library para autor: "${autor}"`);
+            return { libros: [], totalEncontrados: 0 };
+        }
+        
+        const totalEncontrados = response.data.numFound || 0;
+        const docs = response.data.docs;
+        console.log(`   📚 Open Library devolvió ${docs.length} libros (total: ${totalEncontrados})`);
+        
+        const librosFormateados = docs.map(item => ({
+            id: item.key,
+            titulo: item.title,
+            autor: item.author_name ? item.author_name[0] : autor,
+            anio: item.first_publish_year || null,
+            enlaceHTML: item.key ? `https://openlibrary.org${item.key}` : null,
+            enlaceEPUB: null,
+            portada: item.cover_i ? `https://covers.openlibrary.org/b/id/${item.cover_i}-S.jpg` : null
+        }));
+        
+        console.log(`   ✅ [Open Library] Encontrados ${librosFormateados.length} libros (offset ${offset})`);
+        return { libros: librosFormateados, totalEncontrados };
+        
+    } catch (error) {
+        if (error.code === 'ECONNABORTED') {
+            console.error(`   ⏰ Timeout en Open Library: "${autor}"`);
+        } else if (error.response) {
+            console.error(`   ❌ Open Library error ${error.response.status}`);
+        } else {
+            console.error(`   ❌ Open Library error: ${error.message}`);
+        }
+        return { libros: [], totalEncontrados: 0 };
+    }
+}
+
+// Actualizar exports
+module.exports = {
+    buscarPorAutor,
+    buscarPorTitulo,
+    buscarPorAutorConPaginacion  // NUEVA
+};
+
 /**
  * Busca libros por título en Open Library
  * @param {string} titulo - Título del libro
