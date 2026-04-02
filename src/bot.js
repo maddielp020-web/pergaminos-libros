@@ -3,6 +3,7 @@ const { Telegraf } = require('telegraf');
 const { BOT_TOKEN } = require('./config');
 const { buscarPorAutor, buscarPorTitulo, normalizarConsulta, normalizarTitulo } = require('./buscar/gutendex');
 const { formatearListaAutor, formatearLibroUnico, formatearErrorGutendex, obtenerMensajeEspecial } = require('./mensajes/formatear');
+const { buscarPorAutor: buscarPorAutorOL, buscarPorTitulo: buscarPorTituloOL } = require('./buscar/openLibrary');
 const {
     obtenerLibrosPorAutor,
     obtenerLibroPorTitulo,
@@ -46,7 +47,7 @@ function obtenerSesion(usuarioId) {
 async function buscarAutorConAlmacen(ctx, autor, esAdmin = false) {
     console.log(`🔍 Buscando autor: "${autor}" (admin: ${esAdmin})`);
     
-    // Verificar almacén primero
+    // 1. Verificar caché local
     let libros = obtenerLibrosPorAutor(autor);
     
     if (libros && !esAdmin) {
@@ -57,36 +58,56 @@ async function buscarAutorConAlmacen(ctx, autor, esAdmin = false) {
         return;
     }
     
-    // Buscar en Gutendex
+    // 2. Buscar en Open Library (fuente principal)
+    console.log(`📚 Buscando en Open Library: "${autor}"`);
     try {
-        console.log(`🌐 Buscando en Gutendex autor: "${autor}"`);
+        libros = await buscarPorAutorOL(autor, 'es');
+        
+        if (libros.length === 0) {
+            console.log(`🌎 Buscando en Open Library (inglés): "${autor}"`);
+            libros = await buscarPorAutorOL(autor, 'en');
+        }
+        
+        if (libros.length > 0) {
+            console.log(`✅ Open Library encontró ${libros.length} libros para "${autor}"`);
+            guardarLibrosPorAutor(autor, libros);
+            const mensaje = formatearListaAutor(autor, libros);
+            guardarSesion(ctx.from.id, { tipo: 'autor', autor: autor, libros: libros });
+            await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
+            return;
+        }
+    } catch (error) {
+        console.error(`❌ Error en Open Library: ${error.message}`);
+    }
+    
+    // 3. Fallback a Gutendex si Open Library no tiene resultados
+    console.log(`⚠️ Open Library no encontró resultados. Fallback a Gutendex: "${autor}"`);
+    try {
+        const { buscarPorAutor } = require('./buscar/gutendex');
         libros = await buscarPorAutor(autor, 'es');
         
         if (libros.length === 0) {
-            // Intentar en inglés
             libros = await buscarPorAutor(autor, 'en');
         }
         
-        if (libros.length === 0) {
-            const mensajeEspecial = obtenerMensajeEspecial(autor);
-            if (mensajeEspecial) {
-                await ctx.reply(mensajeEspecial, { parse_mode: 'Markdown' });
-            } else {
-                await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre o usá "/titulo [título]".`, { parse_mode: 'Markdown' });
-            }
+        if (libros.length > 0) {
+            console.log(`✅ Gutendex encontró ${libros.length} libros para "${autor}"`);
+            guardarLibrosPorAutor(autor, libros);
+            const mensaje = formatearListaAutor(autor, libros);
+            guardarSesion(ctx.from.id, { tipo: 'autor', autor: autor, libros: libros });
+            await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
             return;
         }
-        
-        // Guardar en almacén
-        guardarLibrosPorAutor(autor, libros);
-        
-        const mensaje = formatearListaAutor(autor, libros);
-        guardarSesion(ctx.from.id, { tipo: 'autor', autor: autor, libros: libros });
-        await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
-        
     } catch (error) {
-        console.error(`❌ Error buscando autor "${autor}":`, error.message);
-        await ctx.reply(formatearErrorGutendex(), { parse_mode: 'Markdown' });
+        console.error(`❌ Error en Gutendex: ${error.message}`);
+    }
+    
+    // 4. Sin resultados de ninguna fuente
+    const mensajeEspecial = obtenerMensajeEspecial(autor);
+    if (mensajeEspecial) {
+        await ctx.reply(mensajeEspecial, { parse_mode: 'Markdown' });
+    } else {
+        await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre o usá "/titulo [título]".`, { parse_mode: 'Markdown' });
     }
 }
 
@@ -94,10 +115,9 @@ async function buscarAutorConAlmacen(ctx, autor, esAdmin = false) {
 async function buscarTituloConAlmacen(ctx, titulo) {
     console.log(`🔍 Buscando título: "${titulo}"`);
     
-    // Normalizar título para búsqueda en almacén
     const tituloNormalizado = normalizarTitulo(titulo);
     
-    // Verificar almacén primero
+    // 1. Verificar caché local
     let libro = obtenerLibroPorTitulo(tituloNormalizado);
     
     if (libro) {
@@ -108,43 +128,66 @@ async function buscarTituloConAlmacen(ctx, titulo) {
         return;
     }
     
-    // Buscar en Gutendex
+    // 2. Buscar en Open Library (fuente principal)
+    console.log(`📚 Buscando en Open Library: "${titulo}"`);
     try {
-        console.log(`🌐 Buscando en Gutendex título: "${titulo}"`);
+        let libros = await buscarPorTituloOL(titulo, 'es');
+        
+        if (libros.length === 0) {
+            console.log(`🌎 Buscando en Open Library (inglés): "${titulo}"`);
+            libros = await buscarPorTituloOL(titulo, 'en');
+        }
+        
+        if (libros.length > 0) {
+            const libroPrincipal = libros[0];
+            console.log(`✅ Open Library encontró libro: "${libroPrincipal.titulo}"`);
+            
+            const claveNormalizada = normalizarTitulo(libroPrincipal.titulo);
+            const libroParaGuardar = { ...libroPrincipal, tituloNormalizado: claveNormalizada };
+            guardarLibroPorTitulo(libroParaGuardar);
+            
+            const mensaje = formatearLibroUnico(libroPrincipal, true);
+            guardarSesion(ctx.from.id, { tipo: 'libro', libro: libroPrincipal });
+            await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
+            return;
+        }
+    } catch (error) {
+        console.error(`❌ Error en Open Library: ${error.message}`);
+    }
+    
+    // 3. Fallback a Gutendex
+    console.log(`⚠️ Open Library no encontró resultados. Fallback a Gutendex: "${titulo}"`);
+    try {
+        const { buscarPorTitulo } = require('./buscar/gutendex');
         let libros = await buscarPorTitulo(titulo, 'es');
         
         if (libros.length === 0) {
             libros = await buscarPorTitulo(titulo, 'en');
         }
         
-        if (libros.length === 0) {
-            const mensajeEspecial = obtenerMensajeEspecial(titulo);
-            if (mensajeEspecial) {
-                await ctx.reply(mensajeEspecial, { parse_mode: 'Markdown' });
-            } else {
-                await ctx.reply(`📚 *No encontré libros para* "${titulo}"\n\n💡 Probá con otro título o usá "/autor [nombre]".`, { parse_mode: 'Markdown' });
-            }
+        if (libros.length > 0) {
+            const libroPrincipal = libros[0];
+            console.log(`✅ Gutendex encontró libro: "${libroPrincipal.titulo}"`);
+            
+            const claveNormalizada = normalizarTitulo(libroPrincipal.titulo);
+            const libroParaGuardar = { ...libroPrincipal, tituloNormalizado: claveNormalizada };
+            guardarLibroPorTitulo(libroParaGuardar);
+            
+            const mensaje = formatearLibroUnico(libroPrincipal, true);
+            guardarSesion(ctx.from.id, { tipo: 'libro', libro: libroPrincipal });
+            await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
             return;
         }
-        
-        // Tomar el primer resultado como el más relevante
-        const libroPrincipal = libros[0];
-        
-        // Normalizar y guardar en almacén
-        const claveNormalizada = normalizarTitulo(libroPrincipal.titulo);
-        const libroParaGuardar = {
-            ...libroPrincipal,
-            tituloNormalizado: claveNormalizada
-        };
-        guardarLibroPorTitulo(libroParaGuardar);
-        
-        const mensaje = formatearLibroUnico(libroPrincipal, true);
-        guardarSesion(ctx.from.id, { tipo: 'libro', libro: libroPrincipal });
-        await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
-        
     } catch (error) {
-        console.error(`❌ Error buscando título "${titulo}":`, error.message);
-        await ctx.reply(formatearErrorGutendex(), { parse_mode: 'Markdown' });
+        console.error(`❌ Error en Gutendex: ${error.message}`);
+    }
+    
+    // 4. Sin resultados
+    const mensajeEspecial = obtenerMensajeEspecial(titulo);
+    if (mensajeEspecial) {
+        await ctx.reply(mensajeEspecial, { parse_mode: 'Markdown' });
+    } else {
+        await ctx.reply(`📚 *No encontré libros para* "${titulo}"\n\n💡 Probá con otro título o usá "/autor [nombre]".`, { parse_mode: 'Markdown' });
     }
 }
 
