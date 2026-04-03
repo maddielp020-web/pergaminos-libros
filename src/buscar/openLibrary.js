@@ -3,14 +3,12 @@ const axios = require('axios');
 
 // ==================== CONFIGURACION ====================
 const TIMEOUT_MS = 15000;
-const LIMITE_RESULTADOS = 10;          // Suficiente para respuesta rápida
+const LIMITE_RESULTADOS = 5;           // 5 libros por página para experiencia móvil
 const MIN_CARACTERES_CONSULTA = 3;     // Evita consultas costosas
 
-// Ya no usamos fields= en la URL - Open Library devuelve todos los campos por defecto
-
-console.log('📚 Módulo openLibrary.js cargado (configuración optimizada)');
+console.log('📚 Módulo openLibrary.js cargado (PAGINACIÓN 5 en 5)');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
-console.log(`   📊 Límite: ${LIMITE_RESULTADOS} resultados`);
+console.log(`   📊 Límite por página: ${LIMITE_RESULTADOS} resultados`);
 
 // ==================== FUNCIONES AUXILIARES INTERNAS ====================
 
@@ -79,15 +77,9 @@ function transformarResultado(item, queryOriginal, tipo) {
         const workId = key.replace('/works/', '');
         enlaceHTML = `https://openlibrary.org/works/${workId}`;
     } else if (key && key.startsWith('/books/')) {
-        // Es una edición, usamos la URL directa
         enlaceHTML = `https://openlibrary.org${key}`;
-        console.log(`   📖 Libro es una edición: ${key}`);
     } else if (key) {
-        // Cualquier otra clave, intentamos construir URL
         enlaceHTML = `https://openlibrary.org${key}`;
-        console.log(`   📖 Clave no estándar: ${key}`);
-    } else {
-        console.log(`   ⚠️ Libro sin key válida`);
     }
     
     // === AÑO ===
@@ -132,7 +124,7 @@ function transformarResultado(item, queryOriginal, tipo) {
 // ==================== FUNCIONES PÚBLICAS PRINCIPALES ====================
 
 /**
- * Busca libros por autor en Open Library
+ * Busca libros por autor en Open Library (versión simple - primeros 5)
  * @param {string} autor - Nombre del autor
  * @param {string} idioma - 'es' o 'en'
  * @returns {Promise<Array>} Lista de libros en formato unificado
@@ -142,9 +134,6 @@ async function buscarPorAutor(autor, idioma = 'es') {
     
     const validacion = validarConsulta(autor, 'autor');
     if (!validacion.valida) {
-        if (validacion.razon === 'demasiado corta') {
-            console.log(`   ⚠️ Búsqueda de autor ignorada: "${autor}" es muy corto`);
-        }
         return [];
     }
     
@@ -152,8 +141,7 @@ async function buscarPorAutor(autor, idioma = 'es') {
     const codigoIdioma = idioma === 'es' ? 'spa' : 'eng';
     
     try {
-        // URL SIMPLIFICADA: sin fields=, sin sort=
-        const url = `https://openlibrary.org/search.json?author=${encodeURIComponent(autorLimpio)}&public_scan_b=true&limit=10&language=${codigoIdioma}`;
+        const url = `https://openlibrary.org/search.json?author=${encodeURIComponent(autorLimpio)}&public_scan_b=true&limit=5&language=${codigoIdioma}`;
         console.log(`   📡 URL: ${url}`);
         
         const response = await axios.get(url, {
@@ -188,10 +176,10 @@ async function buscarPorAutor(autor, idioma = 'es') {
 
 // ==================== FUNCION_BUSCAR_POR_AUTOR_CON_PAGINACION ====================
 /**
- * Busca libros por autor en Open Library con paginación
+ * Busca libros por autor en Open Library con paginación (5 por página)
  * @param {string} autor - Nombre del autor
  * @param {string} idioma - 'es' o 'en'
- * @param {number} offset - Desplazamiento para paginación (0, 10, 20...)
+ * @param {number} offset - Desplazamiento para paginación (0, 5, 10, 15...)
  * @returns {Promise<Object>} { libros, totalEncontrados }
  */
 async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
@@ -204,10 +192,9 @@ async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
     
     const autorLimpio = validacion.consultaLimpia;
     const codigoIdioma = idioma === 'es' ? 'spa' : 'eng';
-    const limite = 10;
+    const limite = LIMITE_RESULTADOS; // 5 libros por página
     
     try {
-        // URL SIMPLIFICADA con offset para paginación
         const url = `https://openlibrary.org/search.json?author=${encodeURIComponent(autorLimpio)}&public_scan_b=true&limit=${limite}&language=${codigoIdioma}&offset=${offset}`;
         console.log(`   📡 URL: ${url}`);
         
@@ -250,6 +237,55 @@ async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
     }
 }
 
+// ==================== FUNCION_BUSCAR_TODOS_LOS_LIBROS_POR_AUTOR ====================
+/**
+ * Busca TODOS los libros de un autor (múltiples páginas de 5 en 5)
+ * @param {string} autor - Nombre del autor
+ * @param {string} idioma - 'es' o 'en'
+ * @param {number} maxLibros - Máximo de libros a recuperar (por defecto 50, para no saturar)
+ * @returns {Promise<Array>} Lista completa de libros
+ */
+async function buscarTodosLosLibrosPorAutor(autor, idioma = 'es', maxLibros = 50) {
+    console.log(`🔍 [Open Library] Buscando TODOS los libros de "${autor}" (máx: ${maxLibros})`);
+    
+    let offset = 0;
+    let todosLosLibros = [];
+    let totalEncontrados = 0;
+    
+    try {
+        // Primera petición para obtener el total
+        const primeraPagina = await buscarPorAutorConPaginacion(autor, idioma, 0);
+        if (primeraPagina.libros.length === 0) {
+            return [];
+        }
+        
+        totalEncontrados = primeraPagina.totalEncontrados;
+        todosLosLibros.push(...primeraPagina.libros);
+        
+        console.log(`   📊 Total de libros encontrados: ${totalEncontrados}`);
+        
+        // Seguir trayendo páginas hasta tener todos (o llegar al máximo)
+        while (todosLosLibros.length < totalEncontrados && todosLosLibros.length < maxLibros) {
+            offset += LIMITE_RESULTADOS;
+            const siguientePagina = await buscarPorAutorConPaginacion(autor, idioma, offset);
+            
+            if (siguientePagina.libros.length === 0) {
+                break;
+            }
+            
+            todosLosLibros.push(...siguientePagina.libros);
+            console.log(`   📚 Progreso: ${todosLosLibros.length}/${Math.min(totalEncontrados, maxLibros)} libros`);
+        }
+        
+        console.log(`   ✅ Total recuperado: ${todosLosLibros.length} libros de "${autor}"`);
+        return todosLosLibros;
+        
+    } catch (error) {
+        console.error(`   ❌ Error buscando todos los libros: ${error.message}`);
+        return todosLosLibros.length > 0 ? todosLosLibros : [];
+    }
+}
+
 // ==================== FUNCION_BUSCAR_POR_TITULO ====================
 /**
  * Busca libros por título en Open Library
@@ -262,9 +298,6 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
     
     const validacion = validarConsulta(titulo, 'título');
     if (!validacion.valida) {
-        if (validacion.razon === 'demasiado corta') {
-            console.log(`   ⚠️ Búsqueda de título ignorada: "${titulo}" es muy corto`);
-        }
         return [];
     }
     
@@ -273,8 +306,7 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
     const codigoIdioma = idioma === 'es' ? 'spa' : 'eng';
     
     try {
-        // URL SIMPLIFICADA: sin fields=, sin sort=
-        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(tituloLimpio)}&public_scan_b=true&limit=10&language=${codigoIdioma}`;
+        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(tituloLimpio)}&public_scan_b=true&limit=5&language=${codigoIdioma}`;
         console.log(`   📡 URL: ${url}`);
         
         const response = await axios.get(url, {
@@ -290,10 +322,9 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
         let docs = response.data.docs;
         console.log(`   📚 Open Library devolvió ${docs.length} documentos`);
         
-        // Transformar todos los resultados
         let librosFormateados = docs.map(item => transformarResultado(item, titulo, 'titulo'));
         
-        // === COINCIDENCIA EXACTA: reordenar para que la mejor coincidencia sea la primera ===
+        // Coincidencia exacta: reordenar para que la mejor coincidencia sea la primera
         let mejorIndice = -1;
         let mejorPuntaje = -1;
         
@@ -301,28 +332,23 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
             const libro = librosFormateados[i];
             const tituloNormalizadoLibro = normalizarTituloParaComparacion(libro.titulo);
             
-            // Coincidencia exacta después de normalización
             if (tituloNormalizadoLibro === tituloNormalizadoConsulta) {
                 mejorIndice = i;
-                mejorPuntaje = 100; // puntaje máximo
+                mejorPuntaje = 100;
                 console.log(`   🎯 Coincidencia EXACTA encontrada: "${libro.titulo}"`);
                 break;
             }
             
-            // Coincidencia parcial (uno contiene al otro)
             if (tituloNormalizadoLibro.includes(tituloNormalizadoConsulta) || 
                 tituloNormalizadoConsulta.includes(tituloNormalizadoLibro)) {
-                // Usar edition_count como criterio de desempate
                 const puntaje = libro.edicionCount || 0;
                 if (puntaje > mejorPuntaje) {
                     mejorPuntaje = puntaje;
                     mejorIndice = i;
-                    console.log(`   📌 Coincidencia parcial: "${libro.titulo}" (ediciones: ${puntaje})`);
                 }
             }
         }
         
-        // Si encontramos una mejor coincidencia y no está ya en el primer lugar, la movemos al frente
         if (mejorIndice > 0) {
             const mejorLibro = librosFormateados[mejorIndice];
             librosFormateados.splice(mejorIndice, 1);
@@ -337,7 +363,7 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
         if (error.code === 'ECONNABORTED') {
             console.error(`   ⏰ Timeout en Open Library: "${titulo}"`);
         } else if (error.response) {
-            console.error(`   ❌ Open Library error ${error.response.status}: ${error.response.statusText}`);
+            console.error(`   ❌ Open Library error ${error.response.status}`);
         } else {
             console.error(`   ❌ Open Library error: ${error.message}`);
         }
@@ -349,5 +375,6 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
 module.exports = {
     buscarPorAutor,
     buscarPorTitulo,
-    buscarPorAutorConPaginacion
+    buscarPorAutorConPaginacion,
+    buscarTodosLosLibrosPorAutor   // NUEVA función para traer TODOS los libros
 };
