@@ -194,16 +194,37 @@ bot.hears(/^más$|^mas$|^Mas$|^MÁS$/i, async (ctx) => {
     }
     
     const nuevaPagina = busqueda.paginaActual + 1;
-    const totalPaginas = Math.ceil(busqueda.libros.length / 5);
+    const offset = nuevaPagina * 5;
     
-    if (nuevaPagina >= totalPaginas) {
-        await ctx.reply(`📚 *No hay más libros para* "${busqueda.autor}"\n\nViste ${busqueda.libros.length} libros en total.\n\n👉 Para buscar otro autor: /autor [nombre]`, { parse_mode: 'Markdown' });
-        return;
+    // Cargar la siguiente página desde Open Library bajo demanda
+    try {
+        const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
+        const siguientePagina = await buscarPorAutorConPaginacion(busqueda.autor, 'es', offset);
+        
+        let nuevosLibros = siguientePagina.libros;
+        if (nuevosLibros.length === 0) {
+            const siguientePaginaEn = await buscarPorAutorConPaginacion(busqueda.autor, 'en', offset);
+            nuevosLibros = siguientePaginaEn.libros;
+        }
+        
+        if (nuevosLibros.length === 0) {
+            await ctx.reply(`📚 *No hay más libros para* "${busqueda.autor}"\n\nViste ${busqueda.total} libros en total.\n\n👉 Para buscar otro autor: /autor [nombre]`, { parse_mode: 'Markdown' });
+            return;
+        }
+        
+        // Actualizar el caché con los libros acumulados
+        const librosExistentes = obtenerLibrosPorAutor(busqueda.autor) || [];
+        const librosActualizados = [...librosExistentes, ...nuevosLibros];
+        guardarLibrosPorAutor(busqueda.autor, librosActualizados);
+        
+        const { mensaje, teclado } = formatearListaAutorConBotones(busqueda.autor, nuevosLibros, nuevaPagina, busqueda.total);
+        guardarBusqueda(usuarioId, busqueda.autor, librosActualizados, nuevaPagina);
+        await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
+        
+    } catch (error) {
+        console.error(`❌ Error en /mas: ${error.message}`);
+        await ctx.reply(`⚠️ Error al cargar más libros. Intentá de nuevo.`, { parse_mode: 'Markdown' });
     }
-    
-    const { mensaje, teclado } = formatearListaAutorConBotones(busqueda.autor, busqueda.libros, nuevaPagina, busqueda.libros.length);
-    guardarBusqueda(usuarioId, busqueda.autor, busqueda.libros, nuevaPagina);
-    await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
 });
 
 // ==================== CALLBACKS (botones) ====================
