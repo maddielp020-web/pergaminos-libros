@@ -75,20 +75,20 @@ async function buscarAutorPrincipal(ctx, autor, esAdmin = false) {
         return;
     }
     
-    // Buscar en Open Library
+    // Buscar TODOS los libros en Open Library (paginación automática)
     try {
-        let libros = await buscarPorAutorOL(autor, 'es');
+        const { buscarTodosLosLibrosPorAutor } = require('./buscar/openLibrary');
+        let todosLosLibros = await buscarTodosLosLibrosPorAutor(autor, 'es', 50);
         
-        if (libros.length === 0) {
-            console.log(`🌎 Probando Open Library en inglés`);
-            libros = await buscarPorAutorOL(autor, 'en');
+        if (todosLosLibros.length === 0) {
+            todosLosLibros = await buscarTodosLosLibrosPorAutor(autor, 'en', 50);
         }
         
-        if (libros.length > 0) {
-            console.log(`✅ Open Library encontró ${libros.length} libros`);
-            guardarLibrosPorAutor(autor, libros);
-            const { mensaje, teclado } = formatearListaAutorConBotones(autor, libros, 0, libros.length);
-            guardarBusqueda(usuarioId, autor, libros, 0);
+        if (todosLosLibros.length > 0) {
+            console.log(`✅ Open Library encontró ${todosLosLibros.length} libros para "${autor}"`);
+            guardarLibrosPorAutor(autor, todosLosLibros);
+            const { mensaje, teclado } = formatearListaAutorConBotones(autor, todosLosLibros, 0, todosLosLibros.length);
+            guardarBusqueda(usuarioId, autor, todosLosLibros, 0);
             await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
             return;
         }
