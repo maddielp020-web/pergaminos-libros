@@ -11,7 +11,6 @@ const MIN_CARACTERES_CONSULTA = 3;     // Evita consultas costosas
 console.log('📚 Módulo openLibrary.js cargado (configuración optimizada)');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
 console.log(`   📊 Límite: ${LIMITE_RESULTADOS} resultados`);
-console.log(`   🔧 Campos solicitados: ${CAMPOS_SOLICITADOS}`);
 
 // ==================== FUNCIONES AUXILIARES INTERNAS ====================
 
