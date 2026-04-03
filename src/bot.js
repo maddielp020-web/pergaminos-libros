@@ -2,7 +2,7 @@
 const { Telegraf } = require('telegraf');
 const { BOT_TOKEN } = require('./config');
 const { buscarPorAutor, buscarPorTitulo, normalizarConsulta, normalizarTitulo } = require('./buscar/gutendex');
-const { formatearListaAutor, formatearLibroUnico, formatearErrorGutendex, obtenerMensajeEspecial } = require('./mensajes/formatear');
+const { formatearListaAutor, formatearListaAutorPaginada, formatearLibroUnico, formatearErrorGutendex, obtenerMensajeEspecial } = require('./mensajes/formatear');
 const { buscarPorAutor: buscarPorAutorOL, buscarPorTitulo: buscarPorTituloOL, buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
 const { guardarSesionAutor, obtenerSesionAutor, eliminarSesionAutor } = require('./almacen/sesionesAutor');
 const {
