@@ -249,13 +249,8 @@ async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
         return { libros: [], totalEncontrados: 0 };
     }
 }
-// Actualizar exports
-module.exports = {
-    buscarPorAutor,
-    buscarPorTitulo,
-    buscarPorAutorConPaginacion  // NUEVA
-};
 
+// ==================== FUNCION_BUSCAR_POR_TITULO ====================
 /**
  * Busca libros por título en Open Library
  * @param {string} titulo - Título del libro
