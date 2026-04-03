@@ -6,16 +6,7 @@ const TIMEOUT_MS = 15000;
 const LIMITE_RESULTADOS = 10;          // Suficiente para respuesta rápida
 const MIN_CARACTERES_CONSULTA = 3;     // Evita consultas costosas
 
-// Campos específicos que pedimos a Open Library (solo lo necesario)
-const CAMPOS_SOLICITADOS = [
-    'key',
-    'title',
-    'author_name',
-    'first_publish_year',
-    'language',
-    'cover_i',
-    'edition_count'
-].join(',');
+// Ya no usamos fields= en la URL - Open Library devuelve todos los campos por defecto
 
 console.log('📚 Módulo openLibrary.js cargado (configuración optimizada)');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
@@ -43,36 +34,6 @@ function validarConsulta(consulta, tipo) {
     }
     
     return { valida: true, consultaLimpia: trimmed };
-}
-
-/**
- * Construye la URL de búsqueda con todos los parámetros óptimos
- * @param {string} tipo - 'autor' o 'titulo'
- * @param {string} valor - El término de búsqueda
- * @param {string} idioma - 'es' o 'en'
- * @returns {string} URL completa
- */
-function construirURL(tipo, valor, idioma) {
-    let url = `https://openlibrary.org/search.json?fields=${CAMPOS_SOLICITADOS}&limit=${LIMITE_RESULTADOS}`;
-    
-    // Ordenar por relevancia (más ediciones primero)
-    url += `&sort=edition_count desc`;
-    
-    // Filtro de idioma ANTES de la búsqueda
-    if (idioma === 'es') {
-        url += `&language=spa`;
-    } else if (idioma === 'en') {
-        url += `&language=eng`;
-    }
-    
-    // Término de búsqueda según tipo
-    if (tipo === 'autor') {
-        url += `&author=${encodeURIComponent(valor)}`;
-    } else if (tipo === 'titulo') {
-        url += `&title=${encodeURIComponent(valor)}`;
-    }
-    
-    return url;
 }
 
 /**
@@ -189,9 +150,11 @@ async function buscarPorAutor(autor, idioma = 'es') {
     }
     
     const autorLimpio = validacion.consultaLimpia;
+    const codigoIdioma = idioma === 'es' ? 'spa' : 'eng';
     
     try {
-        const url = construirURL('autor', autorLimpio, idioma);
+        // URL SIMPLIFICADA: sin fields=, sin sort=
+        const url = `https://openlibrary.org/search.json?author=${encodeURIComponent(autorLimpio)}&public_scan_b=true&limit=10&language=${codigoIdioma}`;
         console.log(`   📡 URL: ${url}`);
         
         const response = await axios.get(url, {
@@ -233,7 +196,7 @@ async function buscarPorAutor(autor, idioma = 'es') {
  * @returns {Promise<Object>} { libros, totalEncontrados }
  */
 async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
-    console.log(`👤 [Open Library] Buscando autor: "${autor}" (idioma: ${idioma}, offset: ${offset})`);
+    console.log(`👤 [Open Library] Buscando autor con paginación: "${autor}" (idioma: ${idioma}, offset: ${offset})`);
     
     const validacion = validarConsulta(autor, 'autor');
     if (!validacion.valida) {
@@ -241,15 +204,12 @@ async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
     }
     
     const autorLimpio = validacion.consultaLimpia;
-    const limite = 10; // Fijo para paginación
+    const codigoIdioma = idioma === 'es' ? 'spa' : 'eng';
+    const limite = 10;
     
     try {
-        let url = `https://openlibrary.org/search.json?author=${encodeURIComponent(autorLimpio)}`;
-        url += `&lang=${idioma === 'es' ? 'spa' : 'eng'}`;
-        url += `&public_scan_b=true`;  // Solo dominio público
-        url += `&limit=${limite}`;
-        url += `&offset=${offset}`;
-        
+        // URL SIMPLIFICADA con offset para paginación
+        const url = `https://openlibrary.org/search.json?author=${encodeURIComponent(autorLimpio)}&public_scan_b=true&limit=${limite}&language=${codigoIdioma}&offset=${offset}`;
         console.log(`   📡 URL: ${url}`);
         
         const response = await axios.get(url, {
@@ -290,7 +250,6 @@ async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
         return { libros: [], totalEncontrados: 0 };
     }
 }
-
 // Actualizar exports
 module.exports = {
     buscarPorAutor,
@@ -317,12 +276,13 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
     
     const tituloLimpio = validacion.consultaLimpia;
     const tituloNormalizadoConsulta = normalizarTituloParaComparacion(tituloLimpio);
+    const codigoIdioma = idioma === 'es' ? 'spa' : 'eng';
     
     try {
-        let url = construirURL('titulo', tituloLimpio, idioma);
-url += `&public_scan_b=true`;
-console.log(`   📡 URL: ${url}`);
-
+        // URL SIMPLIFICADA: sin fields=, sin sort=
+        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(tituloLimpio)}&public_scan_b=true&limit=10&language=${codigoIdioma}`;
+        console.log(`   📡 URL: ${url}`);
+        
         const response = await axios.get(url, {
             timeout: TIMEOUT_MS,
             headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
