@@ -240,25 +240,75 @@ bot.command('autor', async (ctx) => {
 
 // ==================== HANDLER_BUSCAR (alias) ====================
 bot.command('buscar', async (ctx) => {
-    console.log(`🔍 Comando /buscar (alias) de: ${ctx.from.id}`);
+    console.log(`🔍 Comando /buscar de: ${ctx.from.id}`);
     
     const args = ctx.message.text.split(' ').slice(1);
     const query = args.join(' ');
     
     if (!query) {
         await ctx.reply(
-            '❓ *¿Qué libro buscas?*\n\n' +
-            'Usá el comando seguido del título:\n' +
-            '`/buscar Frankenstein`\n\n' +
+            '❓ *¿Qué querés buscar?*\n\n' +
+            'Usá el comando seguido del nombre:\n' +
+            '`/buscar Miguel de Cervantes` (busca como autor)\n' +
+            '`/buscar Don Quijote` (busca como título)\n\n' +
             '📌 *Comandos específicos:*\n' +
-            '• `/titulo [título]` - Busca por título\n' +
-            '• `/autor [nombre]` - Busca por autor\n\n' +
-            'Escribí `/help` para ver todos los comandos.',
+            '• `/titulo [título]` - Busca solo por título\n' +
+            '• `/autor [nombre]` - Busca solo por autor',
             { parse_mode: 'Markdown' }
         );
         return;
     }
     
+    // Intentar como autor primero
+    console.log(`   🔍 Intentando como autor: "${query}"`);
+    
+    // Necesitamos una versión que no envíe mensaje automático si falla
+    const usuarioId = ctx.from.id;
+    let librosEncontrados = null;
+    
+    // Buscar en caché primero
+    let librosCache = obtenerLibrosPorAutor(query);
+    if (librosCache) {
+        librosEncontrados = librosCache;
+    } else {
+        // Buscar en Open Library
+        try {
+            let libros = await buscarPorAutorOL(query, 'es');
+            if (libros.length === 0) {
+                libros = await buscarPorAutorOL(query, 'en');
+            }
+            if (libros.length > 0) {
+                librosEncontrados = libros;
+                guardarLibrosPorAutor(query, libros);
+            }
+        } catch (error) {
+            console.log(`   ⚠️ Error en Open Library: ${error.message}`);
+        }
+        
+        // Si no, Gutendex
+        if (!librosEncontrados) {
+            let libros = await buscarPorAutorGUT(query, 'es');
+            if (libros.length === 0) {
+                libros = await buscarPorAutorGUT(query, 'en');
+            }
+            if (libros.length > 0) {
+                librosEncontrados = libros;
+                guardarLibrosPorAutor(query, libros);
+            }
+        }
+    }
+    
+    // Si encontró como autor, mostrar
+    if (librosEncontrados && librosEncontrados.length > 0) {
+        console.log(`   ✅ Como autor: ${librosEncontrados.length} libros`);
+        guardarSesionAutor(usuarioId, query, librosEncontrados, 0, librosEncontrados.length);
+        const mensaje = formatearListaAutor(query, librosEncontrados);
+        await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        return;
+    }
+    
+    // Si no encontró como autor, intentar como título
+    console.log(`   🔍 Intentando como título: "${query}"`);
     await buscarTituloConAlmacen(ctx, query);
 });
 
