@@ -69,26 +69,37 @@ async function buscarAutorPrincipal(ctx, autor, esAdmin = false) {
     
     if (librosCache && !esAdmin) {
         console.log(`💾 Usando cache para "${autor}" (${librosCache.length} libros)`);
-        const { mensaje, teclado } = formatearListaAutorConBotones(autor, librosCache, 0, librosCache.length);
+        // Solo mostrar los primeros 5 del caché
+        const primeros5 = librosCache.slice(0, 5);
+        const { mensaje, teclado } = formatearListaAutorConBotones(autor, primeros5, 0, librosCache.length);
         guardarBusqueda(usuarioId, autor, librosCache, 0);
         await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
         return;
     }
     
-    // Buscar TODOS los libros en Open Library (paginación automática)
+    // Buscar SOLO los primeros 5 libros (rápido)
     try {
-        const { buscarTodosLosLibrosPorAutor } = require('./buscar/openLibrary');
-        let todosLosLibros = await buscarTodosLosLibrosPorAutor(autor, 'es', 50);
+        const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
+        const primeraPagina = await buscarPorAutorConPaginacion(autor, 'es', 0);
         
-        if (todosLosLibros.length === 0) {
-            todosLosLibros = await buscarTodosLosLibrosPorAutor(autor, 'en', 50);
+        let totalEncontrados = primeraPagina.totalEncontrados;
+        let libros = primeraPagina.libros;
+        
+        if (libros.length === 0) {
+            const primeraPaginaEn = await buscarPorAutorConPaginacion(autor, 'en', 0);
+            libros = primeraPaginaEn.libros;
+            totalEncontrados = primeraPaginaEn.totalEncontrados;
         }
         
-        if (todosLosLibros.length > 0) {
-            console.log(`✅ Open Library encontró ${todosLosLibros.length} libros para "${autor}"`);
-            guardarLibrosPorAutor(autor, todosLosLibros);
-            const { mensaje, teclado } = formatearListaAutorConBotones(autor, todosLosLibros, 0, todosLosLibros.length);
-            guardarBusqueda(usuarioId, autor, todosLosLibros, 0);
+        if (libros.length > 0) {
+            console.log(`✅ Open Library encontró ${totalEncontrados} libros totales, mostrando primeros ${libros.length}`);
+            
+            // Guardar SOLO los primeros 5 en caché (temporalmente)
+            // El resto se cargarán bajo demanda con "más"
+            guardarLibrosPorAutor(autor, libros);
+            
+            const { mensaje, teclado } = formatearListaAutorConBotones(autor, libros, 0, totalEncontrados);
+            guardarBusqueda(usuarioId, autor, { libros: null, total: totalEncontrados, autorNombre: autor });
             await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
             return;
         }
@@ -106,7 +117,8 @@ async function buscarAutorPrincipal(ctx, autor, esAdmin = false) {
         if (libros.length > 0) {
             console.log(`✅ Gutendex encontró ${libros.length} libros`);
             guardarLibrosPorAutor(autor, libros);
-            const { mensaje, teclado } = formatearListaAutorConBotones(autor, libros, 0, libros.length);
+            const primeros5 = libros.slice(0, 5);
+            const { mensaje, teclado } = formatearListaAutorConBotones(autor, primeros5, 0, libros.length);
             guardarBusqueda(usuarioId, autor, libros, 0);
             await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
             return;
