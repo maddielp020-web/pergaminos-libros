@@ -1,17 +1,12 @@
 // ==================== IMPORTACIONES ====================
 const { Telegraf } = require('telegraf');
 const { BOT_TOKEN } = require('./config');
-const { buscarPorAutor, buscarPorTitulo, normalizarConsulta, normalizarTitulo } = require('./buscar/gutendex');
-const { formatearListaAutorConBotones, formatearLibroUnicoConBotones, formatearErrorGutendex, obtenerMensajeEspecial, formatearListaAutorPaginada } = require('./mensajes/formatear');
-const { buscarPorAutor: buscarPorAutorOL, buscarPorTitulo: buscarPorTituloOL, buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
-const { guardarSesionAutor, obtenerSesionAutor, eliminarSesionAutor } = require('./almacen/sesionesAutor');
+const { buscarPorAutor, buscarPorTitulo } = require('./buscar/gutendex');
+const { formatearListaAutorConBotones, formatearLibroUnicoConBotones, obtenerMensajeEspecial } = require('./mensajes/formatear');
+const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
 const {
     obtenerLibrosPorAutor,
-    obtenerLibroPorTitulo,
     guardarLibrosPorAutor,
-    guardarLibroPorTitulo,
-    eliminarAutor,
-    eliminarTitulo,
     obtenerEstadisticas,
     borrarTodo
 } = require('./almacen/almacenManager');
@@ -26,15 +21,16 @@ const busquedasUsuario = new Map();
 console.log('🤖 Bot inicializado - Versión con botones y paginación de 5 libros');
 console.log(`👑 ID Creador: ${ID_CREADOR}`);
 
-// ==================== FUNCION_GUARDAR_BUSQUEDA ====================
-function guardarBusqueda(usuarioId, autor, libros, paginaActual = 0) {
+// ==================== FUNCIONES AUXILIARES ====================
+function guardarBusqueda(usuarioId, autor, libros, paginaActual, totalLibros) {
     busquedasUsuario.set(usuarioId, {
         autor,
-        libros,
+        libros,           // Array de libros (todos los que se han cargado hasta ahora)
         paginaActual,
+        totalLibros,
         timestamp: Date.now()
     });
-    console.log(`💾 Búsqueda guardada para ${usuarioId}: "${autor}" (${libros.length} libros, página ${paginaActual + 1})`);
+    console.log(`💾 Búsqueda guardada para ${usuarioId}: "${autor}" (${libros?.length || 0} libros cargados, total: ${totalLibros}, página ${paginaActual + 1})`);
 }
 
 function obtenerBusqueda(usuarioId) {
@@ -46,40 +42,25 @@ function obtenerBusqueda(usuarioId) {
     return null;
 }
 
-// ==================== FUNCION_MOSTRAR_PAGINA ====================
-async function mostrarPagina(ctx, usuarioId, autor, libros, pagina) {
-    const totalPaginas = Math.ceil(libros.length / 5);
-    if (pagina >= totalPaginas) {
-        await ctx.reply(`📚 *No hay más libros para* "${autor}"\n\nViste ${libros.length} libros en total.`);
-        return;
-    }
-    
-    const { mensaje, teclado, totalPaginas: _ } = formatearListaAutorConBotones(autor, libros, pagina, libros.length);
-    guardarBusqueda(usuarioId, autor, libros, pagina);
-    await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
-}
-
 // ==================== BUSCAR_AUTOR_PRINCIPAL ====================
-async function buscarAutorPrincipal(ctx, autor, esAdmin = false) {
+async function buscarAutorPrincipal(ctx, autor) {
     console.log(`🔍 Buscando autor: "${autor}"`);
     const usuarioId = ctx.from.id;
     
     // Verificar caché local
     let librosCache = obtenerLibrosPorAutor(autor);
     
-    if (librosCache && !esAdmin) {
+    if (librosCache && librosCache.length > 0) {
         console.log(`💾 Usando cache para "${autor}" (${librosCache.length} libros)`);
-        // Solo mostrar los primeros 5 del caché
         const primeros5 = librosCache.slice(0, 5);
         const { mensaje, teclado } = formatearListaAutorConBotones(autor, primeros5, 0, librosCache.length);
-        guardarBusqueda(usuarioId, autor, librosCache, 0);
+        guardarBusqueda(usuarioId, autor, librosCache, 0, librosCache.length);
         await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
         return;
     }
     
-    // Buscar SOLO los primeros 5 libros (rápido)
+    // Buscar SOLO los primeros 5 libros
     try {
-        const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
         const primeraPagina = await buscarPorAutorConPaginacion(autor, 'es', 0);
         
         let totalEncontrados = primeraPagina.totalEncontrados;
@@ -94,12 +75,11 @@ async function buscarAutorPrincipal(ctx, autor, esAdmin = false) {
         if (libros.length > 0) {
             console.log(`✅ Open Library encontró ${totalEncontrados} libros totales, mostrando primeros ${libros.length}`);
             
-            // Guardar SOLO los primeros 5 en caché (temporalmente)
-            // El resto se cargarán bajo demanda con "más"
+            // Guardar en caché
             guardarLibrosPorAutor(autor, libros);
             
             const { mensaje, teclado } = formatearListaAutorConBotones(autor, libros, 0, totalEncontrados);
-            guardarBusqueda(usuarioId, autor, { libros: null, total: totalEncontrados, autorNombre: autor });
+            guardarBusqueda(usuarioId, autor, libros, 0, totalEncontrados);
             await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
             return;
         }
@@ -119,7 +99,7 @@ async function buscarAutorPrincipal(ctx, autor, esAdmin = false) {
             guardarLibrosPorAutor(autor, libros);
             const primeros5 = libros.slice(0, 5);
             const { mensaje, teclado } = formatearListaAutorConBotones(autor, primeros5, 0, libros.length);
-            guardarBusqueda(usuarioId, autor, libros, 0);
+            guardarBusqueda(usuarioId, autor, libros, 0, libros.length);
             await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
             return;
         }
@@ -127,13 +107,7 @@ async function buscarAutorPrincipal(ctx, autor, esAdmin = false) {
         console.error(`❌ Error en Gutendex: ${error.message}`);
     }
     
-    // Sin resultados
-    const mensajeEspecial = obtenerMensajeEspecial(autor);
-    if (mensajeEspecial) {
-        await ctx.reply(mensajeEspecial, { parse_mode: 'Markdown' });
-    } else {
-        await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`, { parse_mode: 'Markdown' });
-    }
+    await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`, { parse_mode: 'Markdown' });
 }
 
 // ==================== HANDLER_AUTOR ====================
@@ -142,83 +116,64 @@ bot.command('autor', async (ctx) => {
     const query = args.join(' ');
     
     if (!query) {
-        await ctx.reply('❓ *Usá:* `/autor [nombre del autor]`\n\nEjemplo: `/autor Gabriel Garcia Marquez`', { parse_mode: 'Markdown' });
+        await ctx.reply('❓ *Usá:* `/autor [nombre del autor]`\n\nEjemplo: `/autor Benito Perez Galdos`', { parse_mode: 'Markdown' });
         return;
     }
     
     await buscarAutorPrincipal(ctx, query);
 });
 
-// ==================== HANDLER_TITULO ====================
-bot.command('titulo', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1);
-    const query = args.join(' ');
-    
-    if (!query) {
-        await ctx.reply('❓ *Usá:* `/titulo [nombre del libro]`\n\nEjemplo: `/titulo Cien años de soledad`', { parse_mode: 'Markdown' });
-        return;
-    }
-    
-    // Buscar por título (simplificado - sin botones por ahora)
-    const libro = obtenerLibroPorTitulo(query);
-    if (libro) {
-        const { mensaje } = formatearLibroUnicoConBotones(libro, true);
-        await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
-        return;
-    }
-    
-    await ctx.reply(`📖 *Buscando:* "${query}"\n\n⚠️ Por ahora, use /autor para buscar por autor. La búsqueda por título exacta se implementará en la próxima versión.`, { parse_mode: 'Markdown' });
-});
-
-// ==================== HANDLER_BUSCAR (alias de autor) ====================
+// ==================== HANDLER_BUSCAR ====================
 bot.command('buscar', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1);
     const query = args.join(' ');
     
     if (!query) {
-        await ctx.reply('❓ *Usá:* `/buscar [nombre del autor]`\n\nEjemplo: `/buscar Jose Marti`\n\n📌 También puede usar `/autor [nombre]`', { parse_mode: 'Markdown' });
+        await ctx.reply('❓ *Usá:* `/buscar [nombre del autor]`\n\nEjemplo: `/buscar Jose Marti`', { parse_mode: 'Markdown' });
         return;
     }
     
     await buscarAutorPrincipal(ctx, query);
 });
 
-// ==================== HANDLER_MAS (texto plano) ====================
+// ==================== HANDLER_MAS ====================
 bot.hears(/^más$|^mas$|^Mas$|^MÁS$/i, async (ctx) => {
     const usuarioId = ctx.from.id;
     const busqueda = obtenerBusqueda(usuarioId);
     
     if (!busqueda) {
-        await ctx.reply('❓ *No tengo una búsqueda activa*\n\nPrimero buscá un autor con `/autor [nombre]` y luego escribí *"más"* para ver más libros.', { parse_mode: 'Markdown' });
+        await ctx.reply('❓ *No tengo una búsqueda activa*\n\nPrimero buscá un autor con `/autor [nombre]` y luego escribí *"más"*.', { parse_mode: 'Markdown' });
         return;
     }
     
     const nuevaPagina = busqueda.paginaActual + 1;
     const offset = nuevaPagina * 5;
     
-    // Cargar la siguiente página desde Open Library bajo demanda
+    if (offset >= busqueda.totalLibros) {
+        await ctx.reply(`📚 *No hay más libros para* "${busqueda.autor}"\n\nViste ${busqueda.totalLibros} libros en total.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
     try {
-        const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
         const siguientePagina = await buscarPorAutorConPaginacion(busqueda.autor, 'es', offset);
-        
         let nuevosLibros = siguientePagina.libros;
+        
         if (nuevosLibros.length === 0) {
             const siguientePaginaEn = await buscarPorAutorConPaginacion(busqueda.autor, 'en', offset);
             nuevosLibros = siguientePaginaEn.libros;
         }
         
         if (nuevosLibros.length === 0) {
-            await ctx.reply(`📚 *No hay más libros para* "${busqueda.autor}"\n\nViste ${busqueda.total} libros en total.\n\n👉 Para buscar otro autor: /autor [nombre]`, { parse_mode: 'Markdown' });
+            await ctx.reply(`📚 *No hay más libros para* "${busqueda.autor}"`, { parse_mode: 'Markdown' });
             return;
         }
         
-        // Actualizar el caché con los libros acumulados
-        const librosExistentes = obtenerLibrosPorAutor(busqueda.autor) || [];
-        const librosActualizados = [...librosExistentes, ...nuevosLibros];
+        // Acumular libros
+        const librosActualizados = [...busqueda.libros, ...nuevosLibros];
         guardarLibrosPorAutor(busqueda.autor, librosActualizados);
         
-        const { mensaje, teclado } = formatearListaAutorConBotones(busqueda.autor, nuevosLibros, nuevaPagina, busqueda.total);
-        guardarBusqueda(usuarioId, busqueda.autor, librosActualizados, nuevaPagina);
+        const { mensaje, teclado } = formatearListaAutorConBotones(busqueda.autor, nuevosLibros, nuevaPagina, busqueda.totalLibros);
+        guardarBusqueda(usuarioId, busqueda.autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
         await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
         
     } catch (error) {
@@ -240,44 +195,21 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
     }
     
     const indice = numero - 1;
-    if (indice >= busqueda.libros.length) {
+    if (!busqueda.libros || indice >= busqueda.libros.length) {
         await ctx.answerCbQuery('Número inválido');
         return;
     }
     
     const libro = busqueda.libros[indice];
+    if (!libro || !libro.titulo) {
+        await ctx.answerCbQuery('Error al obtener el libro');
+        return;
+    }
+    
     const { mensaje } = formatearLibroUnicoConBotones(libro, false);
     
-    await ctx.answerCbQuery(`📖 ${libro.titulo}`);
+    await ctx.answerCbQuery(`📖 ${libro.titulo.substring(0, 50)}`);
     await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
-});
-
-bot.action(/^mas_(.+)_(\d+)$/, async (ctx) => {
-    const autor = ctx.match[1];
-    const paginaActual = parseInt(ctx.match[2]);
-    const usuarioId = ctx.from.id;
-    const busqueda = obtenerBusqueda(usuarioId);
-    
-    if (!busqueda || busqueda.autor !== autor) {
-        await ctx.answerCbQuery('Búsqueda no encontrada');
-        await ctx.reply(`❓ Primero buscá al autor con: /autor ${autor}`);
-        return;
-    }
-    
-    const nuevaPagina = paginaActual;
-    const totalPaginas = Math.ceil(busqueda.libros.length / 5);
-    
-    if (nuevaPagina >= totalPaginas) {
-        await ctx.answerCbQuery('No hay más libros');
-        await ctx.reply(`📚 *No hay más libros para* "${autor}"`);
-        return;
-    }
-    
-    const { mensaje, teclado } = formatearListaAutorConBotones(autor, busqueda.libros, nuevaPagina, busqueda.libros.length);
-    guardarBusqueda(usuarioId, autor, busqueda.libros, nuevaPagina);
-    
-    await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
-    await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
 });
 
 // ==================== HANDLER_START ====================
@@ -289,8 +221,7 @@ bot.command('start', async (ctx) => {
         '• `/buscar [nombre]` - Lo mismo que /autor\n' +
         '• Escribí *"más"* para ver más libros\n' +
         '• Tocá los números azules para ver cada libro\n\n' +
-        '✨ *Ejemplo:*\n' +
-        '`/autor Jose Marti`\n\n' +
+        '✨ *Ejemplo:* `/autor Jose Marti`\n\n' +
         '📖 *100% legal* - Solo dominio público.',
         { parse_mode: 'Markdown' }
     );
@@ -300,31 +231,17 @@ bot.command('help', async (ctx) => {
     await ctx.reply(
         '📖 *Ayuda de PergaminosLibros_Bot*\n\n' +
         '🔍 *Buscar autor:*\n' +
-        '`/autor Jose Marti`\n' +
+        '`/autor Benito Perez Galdos`\n' +
         '`/buscar Ruben Dario`\n\n' +
         '📱 *Navegación:*\n' +
         '• Tocá los números azules para ver el libro\n' +
         '• Escribí *"más"* para ver los siguientes 5 libros\n\n' +
-        '📌 *Notas:*\n' +
-        '• Solo libros de dominio público\n' +
-        '• Los enlaces EPUB se pueden abrir en la app Libros de iPhone\n\n' +
-        '📚 *Proyecto en crecimiento* - Pronto: búsqueda por título',
+        '📚 *Proyecto en crecimiento*',
         { parse_mode: 'Markdown' }
     );
 });
 
 // ==================== HANDLERS_ADMIN ====================
-bot.command('actualizar', async (ctx) => {
-    if (ctx.from.id !== ID_CREADOR) return;
-    const args = ctx.message.text.split(' ').slice(1);
-    const autor = args.join(' ');
-    if (!autor) return;
-    
-    eliminarAutor(autor);
-    await ctx.reply(`🔄 Actualizando "${autor}"...`);
-    await buscarAutorPrincipal(ctx, autor, true);
-});
-
 bot.command('ver_almacen', async (ctx) => {
     if (ctx.from.id !== ID_CREADOR) return;
     const stats = obtenerEstadisticas();
@@ -339,6 +256,7 @@ bot.command('borrar_todo', async (ctx) => {
         return;
     }
     borrarTodo();
+    busquedasUsuario.clear();
     await ctx.reply('✅ Almacén vaciado');
 });
 
