@@ -1,6 +1,20 @@
 // ==================== IMPORTACIONES ====================
 const express = require('express');
-const { PORT } = require('./src/config');
+const dotenv = require('dotenv');
+
+// Cargar variables de entorno
+dotenv.config();
+
+// Importar configuración con fallback
+let PORT = process.env.PORT || 10000;
+
+try {
+    const config = require('./src/config');
+    if (config.PORT) PORT = config.PORT;
+} catch (err) {
+    console.log('⚠️ No se pudo cargar config.js, usando PORT por defecto:', PORT);
+}
+
 const bot = require('./src/bot');
 
 // ==================== CONFIGURACION ====================
@@ -35,7 +49,7 @@ bot.launch()
     .then(() => {
         console.log('✅ Bot de Telegram iniciado correctamente');
         console.log('📍 Modo: Long Polling');
-        console.log('🎯 Comandos disponibles: /start, /buscar, /help');
+        console.log('🎯 Comandos disponibles: /start, /autor, /buscar, /titulo');
     })
     .catch((err) => {
         console.error('❌ Error al iniciar el bot:', err.message);
