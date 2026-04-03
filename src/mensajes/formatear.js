@@ -53,25 +53,22 @@ function formatearLibroUnicoConBotones(libro, mostrarComandos = true) {
     }
     mensaje += `\n\n`;
     
-    // Descripción si existe (sin enlaces de descarga si no es seguro)
+    // Descripción si existe
     if (libro.descripcion) {
         mensaje += `${libro.descripcion}\n\n`;
     }
     
-    // Solo mostrar enlaces si es 100% dominio público
-    if (libro.esDominioPublico === true) {
-        if (libro.enlaceHTML) {
-            mensaje += `🌐 *Leer online:* [Versión web](${libro.enlaceHTML})\n`;
-        }
-        if (libro.enlaceEPUB) {
-            mensaje += `📱 *Descargar EPUB:* [Para iPhone/Android](${libro.enlaceEPUB})\n`;
-        }
+    // Mostrar enlaces de dominio público (asumimos que todo lo que llega de Open Library con public_scan_b=true es dominio público)
+    if (libro.enlaceHTML) {
+        mensaje += `🌐 *Leer online:* [Versión web](${libro.enlaceHTML})\n`;
+    }
+    if (libro.enlaceEPUB) {
+        mensaje += `📱 *Descargar EPUB:* [Para iPhone/Android](${libro.enlaceEPUB})\n`;
+    }
+    
+    // Solo añadir salto de línea si hay enlaces
+    if (libro.enlaceHTML || libro.enlaceEPUB) {
         mensaje += `\n`;
-    } else if (libro.enlaceInfo) {
-        mensaje += `ℹ️ [Ver más información en biblioteca pública](${libro.enlaceInfo})\n\n`;
-    } else if (!libro.esDominioPublico) {
-        mensaje += `⚠️ *Este libro puede tener derechos de autor.*\n`;
-        mensaje += `📋 Solo se muestra información básica.\n\n`;
     }
     
     if (mostrarComandos) {
@@ -79,7 +76,7 @@ function formatearLibroUnicoConBotones(libro, mostrarComandos = true) {
         mensaje += `👉 /autor ${libro.autor}\n`;
     }
     
-    return { mensaje, tieneEnlaces: (libro.esDominioPublico === true && (libro.enlaceHTML || libro.enlaceEPUB)) };
+    return { mensaje, tieneEnlaces: (libro.enlaceHTML || libro.enlaceEPUB) };
 }
 
 // ==================== FUNCION_FORMATEAR_ERROR ====================
