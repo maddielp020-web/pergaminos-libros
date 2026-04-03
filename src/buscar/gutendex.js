@@ -109,7 +109,7 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
         
         if (tipo === 'autor') {
             // PARÁMETRO OFICIAL: search=author:Nombre
-            url += `&search=author:${encodeURIComponent(query)}`;
+            url += `&search=${encodeURIComponent(query)}`;
             console.log(`   👤 URL autor (oficial): ${url}`);
         } else {
             url += `&search=${encodeURIComponent(query)}`;
@@ -188,30 +188,27 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
 async function buscarPorAutor(autor, idioma = 'es') {
     console.log(`👤 BUSCAR POR AUTOR: "${autor}" (idioma inicial: ${idioma})`);
     
-    // Generar todos los formatos posibles del nombre
-    const formatos = [];
-    const autorOriginal = autor.trim();
+    async function buscarPorAutor(autor, idioma = 'es') {
+    console.log(`👤 BUSCAR POR AUTOR: "${autor}" (idioma inicial: ${idioma})`);
     
-    // Formato 1: Original
-    formatos.push(autorOriginal);
-    
-    // Formato 2: "Apellido, Nombre" si tiene espacio y no tiene coma
-    if (autorOriginal.includes(' ') && !autorOriginal.includes(',')) {
-        const partes = autorOriginal.split(' ');
-        const apellido = partes[partes.length - 1];
-        const nombres = partes.slice(0, -1).join(' ');
-        formatos.push(`${apellido}, ${nombres}`);
+    // Probar en español
+    let libros = await buscarLibrosEnGutendex(autor, 'es', 'autor');
+    if (libros.length > 0) {
+        console.log(`   ✅ ENCONTRADOS ${libros.length} libros en español`);
+        return libros;
     }
     
-    // Formato 3: Solo apellido (última palabra)
-    if (autorOriginal.includes(' ')) {
-        const partes = autorOriginal.split(' ');
-        formatos.push(partes[partes.length - 1]);
+    // Probar en inglés si español falla
+    console.log(`   🌎 Sin resultados en español, probando en inglés...`);
+    libros = await buscarLibrosEnGutendex(autor, 'en', 'autor');
+    if (libros.length > 0) {
+        console.log(`   ✅ ENCONTRADOS ${libros.length} libros en inglés`);
+        return libros;
     }
     
-    // Eliminar duplicados
-    const formatosUnicos = [...new Set(formatos)];
-    console.log(`   📝 Formatos a probar: ${formatosUnicos.join(' | ')}`);
+    console.log(`   ❌ No se encontraron libros para "${autor}"`);
+    return [];
+}
     
     // Probar cada formato en español
     for (const formato of formatosUnicos) {
