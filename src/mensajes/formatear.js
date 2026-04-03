@@ -1,129 +1,129 @@
 // ==================== IMPORTACIONES ====================
-const { normalizarTitulo } = require('../buscar/gutendex');
+const { Markup } = require('telegraf');
 
-console.log('📝 Módulo formatear.js cargado (FASE 3 - Formato compacto)');
-
-// ==================== MENSAJES_ESPECIALES ====================
-const MENSAJES_ESPECIALES = [
-    {
-        palabrasClave: ['principito', 'el principito'],
-        mensaje: `ℹ️ *El Principito* no es de dominio público en EE.UU. (fuente de Project Gutenberg).\n\n📚 Prueba con "/autor Antoine de Saint-Exupéry" para ver otros libros del autor.`
-    },
-    {
-        palabrasClave: ['harry potter', 'potter'],
-        mensaje: `ℹ️ *Harry Potter* está protegido por derechos de autor.\n\n📚 Prueba con libros de fantasía en dominio público: "El Mago de Oz", "Alicia en el País de las Maravillas".`
-    }
-];
-
-// ==================== FUNCION_FORMATEAR_LISTA_AUTOR_PAGINADA ====================
-/**
- * Formatea una lista de libros con numeración y año (para paginación)
- * @param {string} autor - Nombre del autor
- * @param {Array} libros - Lista de libros (máximo 10 para una página)
- * @param {number} paginaInicio - Número inicial para la numeración (ej: 1, 11, 21)
- * @param {number} totalLibros - Total de libros encontrados
- * @returns {string} Mensaje formateado
- */
-function formatearListaAutorPaginada(autor, libros, paginaInicio, totalLibros) {
-    console.log(`📝 Formateando lista paginada: "${autor}" (${libros.length} libros, inicio #${paginaInicio})`);
+// ==================== FUNCION_FORMATEAR_LISTA_AUTOR_CON_BOTONES ====================
+function formatearListaAutorConBotones(autor, libros, pagina = 0, total = null) {
+    const inicio = pagina * 5;
+    const fin = inicio + 5;
+    const librosPagina = libros.slice(inicio, fin);
+    const totalLibros = total || libros.length;
+    const paginaActualNum = pagina + 1;
+    const totalPaginas = Math.ceil(totalLibros / 5);
     
-    if (!libros || libros.length === 0) {
-        return `📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`;
-    }
+    let mensaje = `📚 *${autor}* (${totalLibros} libros encontrados)\n\n`;
     
-    let resultado = `📚 *${autor}* (${totalLibros} libro${totalLibros !== 1 ? 's' : ''})\n\n`;
-    
-    libros.forEach((libro, idx) => {
-        const numero = paginaInicio + idx;
-        const anio = libro.anio ? ` (${libro.anio})` : '';
-        resultado += `${numero}. *${libro.titulo}*${anio}\n`;
+    librosPagina.forEach((libro, idx) => {
+        const numero = inicio + idx + 1;
+        const año = libro.anio ? ` (${libro.anio})` : '';
+        mensaje += `${numero}. ${libro.titulo}${año}\n`;
     });
     
-    resultado += `\n👉 Para ver detalles de un libro, usá: /titulo "nombre exacto del libro"`;
+    mensaje += `\n👇 *Toque el número del libro que quiere ver*\n`;
+    mensaje += `📌 Para ver más: escriba *"más"*\n`;
+    mensaje += `🔍 Para buscar otro autor: /autor [nombre]`;
     
-    return resultado;
-}
-
-// ==================== FUNCION_FORMATEAR_LIBRO_UNICO ====================
-function formatearLibroUnico(libro, sugerirAutor = null) {
-    console.log(`📝 Formateando libro único: "${libro.titulo}"`);
-    
-    let resultado = `📖 *${libro.titulo}*\n`;
-    resultado += `👤 ${libro.autor}`;
-    if (libro.anio) resultado += ` (${libro.anio})`;
-    resultado += `\n\n`;
-    
-    // Enlaces
-    const enlaces = [];
-    if (libro.enlaceHTML) enlaces.push(`🌐 [Leer online](${libro.enlaceHTML})`);
-    if (libro.enlaceEPUB) enlaces.push(`📱 [Descargar EPUB](${libro.enlaceEPUB})`);
-    
-    if (enlaces.length > 0) {
-        resultado += enlaces.join('  |  ');
-        resultado += `\n\n`;
-    } else {
-        resultado += `📖 *Sin enlaces disponibles*\n\n`;
+    // Crear botones: 1 2 3 4 5 en una fila
+    const botones = [];
+    for (let i = 0; i < librosPagina.length; i++) {
+        const numero = inicio + i + 1;
+        botones.push(Markup.button.callback(`${numero}`, `libro_${numero}`));
     }
     
-    resultado += `🔗 Fuente: Project Gutenberg (Gutendex)`;
-    
-    // Sugerir búsqueda por autor
-    if (sugerirAutor) {
-        resultado += `\n\n👉 ¿Querés ver otros libros de ${libro.autor}? Usá /autor ${libro.autor}`;
+    // Si hay más páginas, añadir botón "Más ➡️"
+    const filas = [];
+    if (botones.length > 0) {
+        filas.push(botones);
+    }
+    if (pagina + 1 < totalPaginas) {
+        filas.push([Markup.button.callback('📖 Más libros ➡️', `mas_${autor}_${pagina + 1}`)]);
     }
     
-    return resultado;
+    const teclado = Markup.inlineKeyboard(filas);
+    
+    return { mensaje, teclado, totalPaginas };
 }
 
-// ==================== FUNCION_MENSAJE_ERROR_GUTENDEX ====================
-function formatearErrorGutendex() {
-    return `⚠️ La biblioteca no está disponible en este momento. Intentá más tarde.`;
+// ==================== FUNCION_FORMATEAR_LIBRO_UNICO_CON_BOTONES ====================
+function formatearLibroUnicoConBotones(libro, mostrarComandos = true) {
+    let mensaje = `📖 *${libro.titulo}*\n`;
+    mensaje += `👤 *${libro.autor}*`;
+    
+    if (libro.anio) {
+        mensaje += ` (${libro.anio})`;
+    }
+    mensaje += `\n\n`;
+    
+    // Descripción si existe (sin enlaces de descarga si no es seguro)
+    if (libro.descripcion) {
+        mensaje += `${libro.descripcion}\n\n`;
+    }
+    
+    // Solo mostrar enlaces si es 100% dominio público
+    if (libro.esDominioPublico === true) {
+        if (libro.enlaceHTML) {
+            mensaje += `🌐 *Leer online:* [Versión web](${libro.enlaceHTML})\n`;
+        }
+        if (libro.enlaceEPUB) {
+            mensaje += `📱 *Descargar EPUB:* [Para iPhone/Android](${libro.enlaceEPUB})\n`;
+        }
+        mensaje += `\n`;
+    } else if (libro.enlaceInfo) {
+        mensaje += `ℹ️ [Ver más información en biblioteca pública](${libro.enlaceInfo})\n\n`;
+    } else if (!libro.esDominioPublico) {
+        mensaje += `⚠️ *Este libro puede tener derechos de autor.*\n`;
+        mensaje += `📋 Solo se muestra información básica.\n\n`;
+    }
+    
+    if (mostrarComandos) {
+        mensaje += `🔍 *¿Quiere más libros de este autor?*\n`;
+        mensaje += `👉 /autor ${libro.autor}\n`;
+    }
+    
+    return { mensaje, tieneEnlaces: (libro.esDominioPublico === true && (libro.enlaceHTML || libro.enlaceEPUB)) };
 }
 
-// ==================== FUNCION_MENSAJE_ESPECIAL ====================
+// ==================== FUNCION_FORMATEAR_ERROR ====================
+function formatearErrorGutendex(autor) {
+    return `⚠️ *No se pudo encontrar información para* "${autor}"\n\n💡 Intente con otro nombre o revise la ortografía.`;
+}
+
+// ==================== FUNCION_OBTENER_MENSAJE_ESPECIAL ====================
 function obtenerMensajeEspecial(query) {
-    const queryLower = query.toLowerCase();
-    for (const item of MENSAJES_ESPECIALES) {
-        for (const palabra of item.palabrasClave) {
-            if (queryLower.includes(palabra)) {
-                return item.mensaje;
-            }
+    const especiales = {
+        "shakespeare": "📚 *William Shakespeare*\n\n¿Buscaba a Shakespeare? Pruebe con:\n`/autor William Shakespeare`",
+        "cervantes": "📚 *Miguel de Cervantes*\n\n¿Buscaba a Cervantes? Pruebe con:\n`/autor Miguel de Cervantes`",
+        "becquer": "📚 *Gustavo Adolfo Bécquer*\n\n¿Buscaba a Bécquer? Pruebe con:\n`/autor Gustavo Adolfo Becquer` (sin acento)"
+    };
+    
+    const clave = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    for (const [key, value] of Object.entries(especiales)) {
+        if (clave.includes(key)) {
+            return value;
         }
     }
     return null;
 }
 
-// ==================== FUNCION_FORMATEAR_LISTA_AUTOR ====================
-/**
- * Formatea una lista de libros para mostrar por autor (sin paginación)
- * @param {string} autor - Nombre del autor
- * @param {Array} libros - Lista de libros
- * @returns {string} Mensaje formateado
- */
-function formatearListaAutor(autor, libros) {
-    console.log(`📝 Formateando lista de autor: "${autor}" (${libros.length} libros)`);
-    
-    if (!libros || libros.length === 0) {
-        return `📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`;
-    }
-    
-    let resultado = `📚 *${autor}* (${libros.length} libro${libros.length !== 1 ? 's' : ''})\n\n`;
+// ==================== FUNCION_FORMATEAR_LISTA_AUTOR_PAGINADA ====================
+function formatearListaAutorPaginada(autor, libros, inicio, total) {
+    let mensaje = `📚 *${autor}* (libros ${inicio}-${Math.min(inicio + libros.length - 1, total)} de ${total})\n\n`;
     
     libros.forEach((libro, idx) => {
-        const anio = libro.anio ? ` (${libro.anio})` : '';
-        resultado += `${idx + 1}. *${libro.titulo}*${anio}\n`;
+        const numero = inicio + idx;
+        const año = libro.anio ? ` (${libro.anio})` : '';
+        mensaje += `${numero}. ${libro.titulo}${año}\n`;
     });
     
-    resultado += `\n👉 Para ver detalles de un libro, usá: /titulo "nombre exacto del libro"`;
+    mensaje += `\n👉 Escriba *"más"* para seguir viendo libros de ${autor}.`;
     
-    return resultado;
+    return mensaje;
 }
 
 // ==================== EXPORTS ====================
 module.exports = {
-    formatearListaAutor,           // NUEVA
-    formatearListaAutorPaginada,
-    formatearLibroUnico,
+    formatearListaAutorConBotones,
+    formatearLibroUnicoConBotones,
     formatearErrorGutendex,
-    obtenerMensajeEspecial
+    obtenerMensajeEspecial,
+    formatearListaAutorPaginada
 };
