@@ -100,7 +100,7 @@ async function buscarAutorPrincipal(ctx, autor) {
 }
 
 // ==================== HANDLER_START ====================
-bot.command('start', async (ctx) {
+bot.command('start', async (ctx) => {
     await ctx.reply(
         '📖 ¡Bienvenido a PergaminosAbiertos!\n\n' +
         'Aquí encuentras libros en dominio público al instante.\n\n' +
@@ -113,7 +113,7 @@ bot.command('start', async (ctx) {
 });
 
 // ==================== HANDLER_AYUDA ====================
-bot.command('ayuda', async (ctx) {
+bot.command('ayuda', async (ctx) => {
     await ctx.reply(
         '📘 <b>AYUDA DE PERGAMINOSLIBROS_BOT</b>\n\n' +
         '🔹 <b>COMANDOS DISPONIBLES:</b>\n\n' +
