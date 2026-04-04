@@ -234,6 +234,20 @@ bot.command('start', async (ctx) => {
     );
 });
 
+bot.command('help', async (ctx) => {
+    await ctx.reply(
+        '📖 *Ayuda de PergaminosLibros_Bot*\n\n' +
+        '🔍 *Buscar autor:*\n' +
+        '`/autor Benito Perez Galdos`\n' +
+        '`/buscar Ruben Dario`\n\n' +
+        '📱 *Navegación:*\n' +
+        '• Tocá los números azules para ver el libro\n' +
+        '• Escribí *"más"* para ver los siguientes 5 libros\n\n' +
+        '📚 *Proyecto en crecimiento*',
+        { parse_mode: 'Markdown' }
+    );
+});
+
 // ==================== HANDLERS_ADMIN ====================
 bot.command('ver_almacen', async (ctx) => {
     if (ctx.from.id !== ID_CREADOR) return;
