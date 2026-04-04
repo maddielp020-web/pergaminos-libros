@@ -35,8 +35,8 @@ function formatearListaAutorConBotones(autor, libros, pagina = 0, total = null) 
         filas.push(botones);
     }
     if (pagina + 1 < totalPaginas) {
-        filas.push([Markup.button.callback('📖 Más libros ➡️', `mas_${autor}_${pagina + 1}`)]);
-    }
+    filas.push([Markup.button.callback('📖 Siguientes 5 →', `mas_${autor}_${pagina + 1}`)]);
+}
     
     const teclado = Markup.inlineKeyboard(filas);
     
