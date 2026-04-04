@@ -230,21 +230,21 @@ bot.command('start', async (ctx) => {
         '⚠️ Los años de publicación pueden variar según biblioteca de origen.\n\n' +
         '📌 100% legal. Solo dominio público.\n\n' +
         '¡Empezá ahora!',
-        { parse_mode: 'Markdown' }
+        { parse_mode: 'HTML' }  // Cambiado de Markdown a HTML
     );
 });
 
+// ==================== HANDLER_HELP ====================
 bot.command('help', async (ctx) => {
     await ctx.reply(
-        '📖 *Ayuda de PergaminosLibros_Bot*\n\n' +
-        '🔍 *Buscar autor:*\n' +
-        '`/autor Benito Perez Galdos`\n' +
-        '`/buscar Ruben Dario`\n\n' +
-        '📱 *Navegación:*\n' +
+        '📖 Ayuda de PergaminosLibros_Bot\n\n' +
+        '🔍 Buscar autor:\n' +
+        '/autor Benito Perez Galdos\n' +
+        '/buscar Ruben Dario\n\n' +
+        '📱 Navegación:\n' +
         '• Tocá los números azules para ver el libro\n' +
-        '• Escribí *"más"* para ver los siguientes 5 libros\n\n' +
-        '📚 *Proyecto en crecimiento*',
-        { parse_mode: 'Markdown' }
+        '• Escribí "más" para ver los siguientes 5 libros\n\n' +
+        '📚 Proyecto en crecimiento'
     );
 });
 
