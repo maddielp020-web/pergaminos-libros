@@ -215,28 +215,21 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
     await ctx.reply(
-        '📚 *Bienvenido a PergaminosLibros_Bot*\n\n' +
-        '🔍 *Comandos:*\n' +
-        '• `/autor [nombre]` - Busca libros por autor\n' +
-        '• `/buscar [nombre]` - Lo mismo que /autor\n' +
-        '• Escribí *"más"* para ver más libros\n' +
-        '• Tocá los números azules para ver cada libro\n\n' +
-        '✨ *Ejemplo:* `/autor Jose Marti`\n\n' +
-        '📖 *100% legal* - Solo dominio público.',
-        { parse_mode: 'Markdown' }
-    );
-});
-
-bot.command('help', async (ctx) => {
-    await ctx.reply(
-        '📖 *Ayuda de PergaminosLibros_Bot*\n\n' +
-        '🔍 *Buscar autor:*\n' +
-        '`/autor Benito Perez Galdos`\n' +
-        '`/buscar Ruben Dario`\n\n' +
-        '📱 *Navegación:*\n' +
-        '• Tocá los números azules para ver el libro\n' +
-        '• Escribí *"más"* para ver los siguientes 5 libros\n\n' +
-        '📚 *Proyecto en crecimiento*',
+        '📖 ¡Bienvenido a PergaminosAbiertos!\n\n' +
+        'Soy PergaminosLibros_Bot. Te ayudo a encontrar libros en dominio público.\n\n' +
+        '🔹 COMANDOS:\n' +
+        '/autor [nombre]\n' +
+        '/buscar [nombre]\n' +
+        '/titulo [nombre]\n' +
+        '/help\n\n' +
+        '🔹 CÓMO USARLO:\n' +
+        '1. Escribí /autor + nombre (ej: /autor Jose Marti)\n' +
+        '2. Verás 5 libros con botones numéricos\n' +
+        '3. Tocá el número del libro que quieras\n' +
+        '4. Si hay más, tocá "📖 Más libros ➡️"\n\n' +
+        '⚠️ Los años de publicación pueden variar según biblioteca de origen.\n\n' +
+        '📌 100% legal. Solo dominio público.\n\n' +
+        '¡Empezá ahora!',
         { parse_mode: 'Markdown' }
     );
 });
