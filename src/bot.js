@@ -164,7 +164,7 @@ bot.command('buscar', async (ctx) => {
     await buscarAutorPrincipal(ctx, query);
 });
 
-// ==================== HANDLER_TITULO (placeholder - no funciona aún) ====================
+// ==================== HANDLER_TITULO (placeholder) ====================
 bot.command('titulo', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1);
     const query = args.join(' ');
