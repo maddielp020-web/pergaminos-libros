@@ -15,7 +15,7 @@ const {
 const bot = new Telegraf(BOT_TOKEN);
 const ID_CREADOR = 2022025893;
 
-// Cache en memoria para resultados de búsqueda (por usuario)
+// Cache en memoria para resultados de búsqueda
 const busquedasUsuario = new Map();
 
 console.log('🤖 Bot inicializado - Versión con botones y paginación de 5 libros');
@@ -25,12 +25,11 @@ console.log(`👑 ID Creador: ${ID_CREADOR}`);
 function guardarBusqueda(usuarioId, autor, libros, paginaActual, totalLibros) {
     busquedasUsuario.set(usuarioId, {
         autor,
-        libros,           // Array de libros (todos los que se han cargado hasta ahora)
+        libros,
         paginaActual,
         totalLibros,
         timestamp: Date.now()
     });
-    console.log(`💾 Búsqueda guardada para ${usuarioId}: "${autor}" (${libros?.length || 0} libros cargados, total: ${totalLibros}, página ${paginaActual + 1})`);
 }
 
 function obtenerBusqueda(usuarioId) {
@@ -47,11 +46,9 @@ async function buscarAutorPrincipal(ctx, autor) {
     console.log(`🔍 Buscando autor: "${autor}"`);
     const usuarioId = ctx.from.id;
     
-    // Verificar caché local
     let librosCache = obtenerLibrosPorAutor(autor);
     
     if (librosCache && librosCache.length > 0) {
-        console.log(`💾 Usando cache para "${autor}" (${librosCache.length} libros)`);
         const primeros5 = librosCache.slice(0, 5);
         const { mensaje, teclado } = formatearListaAutorConBotones(autor, primeros5, 0, librosCache.length);
         guardarBusqueda(usuarioId, autor, librosCache, 0, librosCache.length);
@@ -59,10 +56,8 @@ async function buscarAutorPrincipal(ctx, autor) {
         return;
     }
     
-    // Buscar SOLO los primeros 5 libros
     try {
         const primeraPagina = await buscarPorAutorConPaginacion(autor, 'es', 0);
-        
         let totalEncontrados = primeraPagina.totalEncontrados;
         let libros = primeraPagina.libros;
         
@@ -73,11 +68,7 @@ async function buscarAutorPrincipal(ctx, autor) {
         }
         
         if (libros.length > 0) {
-            console.log(`✅ Open Library encontró ${totalEncontrados} libros totales, mostrando primeros ${libros.length}`);
-            
-            // Guardar en caché
             guardarLibrosPorAutor(autor, libros);
-            
             const { mensaje, teclado } = formatearListaAutorConBotones(autor, libros, 0, totalEncontrados);
             guardarBusqueda(usuarioId, autor, libros, 0, totalEncontrados);
             await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
@@ -87,7 +78,6 @@ async function buscarAutorPrincipal(ctx, autor) {
         console.error(`❌ Error en Open Library: ${error.message}`);
     }
     
-    // Fallback a Gutendex
     try {
         let libros = await buscarPorAutor(autor, 'es');
         if (libros.length === 0) {
@@ -95,7 +85,6 @@ async function buscarAutorPrincipal(ctx, autor) {
         }
         
         if (libros.length > 0) {
-            console.log(`✅ Gutendex encontró ${libros.length} libros`);
             guardarLibrosPorAutor(autor, libros);
             const primeros5 = libros.slice(0, 5);
             const { mensaje, teclado } = formatearListaAutorConBotones(autor, primeros5, 0, libros.length);
@@ -109,6 +98,45 @@ async function buscarAutorPrincipal(ctx, autor) {
     
     await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`, { parse_mode: 'Markdown' });
 }
+
+// ==================== HANDLER_START ====================
+bot.command('start', async (ctx) => {
+    await ctx.reply(
+        '📖 ¡Bienvenido a PergaminosAbiertos!\n\n' +
+        'Aquí encuentras libros en dominio público al instante.\n\n' +
+        'Pruébalo ahora:\n' +
+        '`/autor Jose Marti`\n\n' +
+        '¿Ves los botones? Elige uno y el libro aparece.\n\n' +
+        '📘 ¿Dudas? Escribe /ayuda y te explico cómo leer o descargar.',
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// ==================== HANDLER_AYUDA ====================
+bot.command('ayuda', async (ctx) => {
+    await ctx.reply(
+        '📘 *AYUDA DE PERGAMINOSLIBROS_BOT*\n\n' +
+        '🔹 *COMANDOS DISPONIBLES:*\n\n' +
+        '`/autor [nombre]`\n' +
+        'Ejemplo: `/autor Jose Marti`\n' +
+        '→ Búsqueda EXACTA por autor. Devuelve 5 libros.\n\n' +
+        '`/titulo [nombre]`\n' +
+        'Ejemplo: `/titulo El Principito`\n' +
+        '→ Búsqueda EXACTA por título.\n\n' +
+        '`/busqueda-amplia [nombre]`\n' +
+        'Ejemplo: `/busqueda-amplia Jose Marti`\n' +
+        '→ Búsqueda AMPLIA en autor, título y descripción. Devuelve más resultados.\n\n' +
+        '🔹 *CÓMO FUNCIONA:*\n\n' +
+        '1. Usa cualquier comando\n' +
+        '2. El bot te mostrará libros con botones numéricos\n' +
+        '3. Toca el número del libro que quieras\n' +
+        '4. Si hay más de 5, toca "📖 Siguientes 5 →"\n\n' +
+        '🔹 *¿PUEDO LEER O DESCARGAR?*\n\n' +
+        'Sí. Cuando el bot te muestre un libro, toca "📖 Ver libro" y podrás leer online o descargar gratis.\n\n' +
+        '📌 *Los años de publicación pueden variar según biblioteca.*',
+        { parse_mode: 'Markdown' }
+    );
+});
 
 // ==================== HANDLER_AUTOR ====================
 bot.command('autor', async (ctx) => {
@@ -136,53 +164,96 @@ bot.command('buscar', async (ctx) => {
     await buscarAutorPrincipal(ctx, query);
 });
 
-// ==================== HANDLER_MAS ====================
-bot.hears(/^más$|^mas$|^Mas$|^MÁS$/i, async (ctx) => {
-    const usuarioId = ctx.from.id;
-    const busqueda = obtenerBusqueda(usuarioId);
+// ==================== HANDLER_TITULO (placeholder - no funciona aún) ====================
+bot.command('titulo', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1);
+    const query = args.join(' ');
     
-    if (!busqueda) {
-        await ctx.reply('❓ *No tengo una búsqueda activa*\n\nPrimero buscá un autor con `/autor [nombre]` y luego escribí *"más"*.', { parse_mode: 'Markdown' });
+    if (!query) {
+        await ctx.reply('❓ *Usá:* `/titulo [nombre del libro]`\n\nEjemplo: `/titulo El Principito`', { parse_mode: 'Markdown' });
         return;
     }
     
-    const nuevaPagina = busqueda.paginaActual + 1;
+    await ctx.reply(
+        `📖 *Buscando:* "${query}"\n\n` +
+        `⚠️ La búsqueda por título estará disponible pronto.\n\n` +
+        `💡 Mientras tanto, probá con:\n` +
+        `/autor "${query}"`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// ==================== HANDLER_BUSQUEDA_AMPLIA (placeholder) ====================
+bot.command('busqueda-amplia', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1);
+    const query = args.join(' ');
+    
+    if (!query) {
+        await ctx.reply('❓ *Usá:* `/busqueda-amplia [nombre]`\n\nEjemplo: `/busqueda-amplia Jose Marti`', { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    await ctx.reply(
+        `🔍 *Búsqueda amplia:* "${query}"\n\n` +
+        `⚠️ Esta función estará disponible pronto.\n\n` +
+        `💡 Mientras tanto, probá con:\n` +
+        `/autor "${query}"`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// ==================== BOTÓN SIGUIENTES 5 ====================
+bot.action(/^mas_(.+)_(\d+)$/, async (ctx) => {
+    const autor = ctx.match[1];
+    const paginaActual = parseInt(ctx.match[2]);
+    const usuarioId = ctx.from.id;
+    const busqueda = obtenerBusqueda(usuarioId);
+    
+    if (!busqueda || busqueda.autor !== autor) {
+        await ctx.answerCbQuery('Búsqueda no encontrada');
+        await ctx.reply(`❓ Primero buscá al autor con: /autor ${autor}`);
+        return;
+    }
+    
+    const nuevaPagina = paginaActual;
     const offset = nuevaPagina * 5;
     
     if (offset >= busqueda.totalLibros) {
-        await ctx.reply(`📚 *No hay más libros para* "${busqueda.autor}"\n\nViste ${busqueda.totalLibros} libros en total.`, { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery('No hay más libros');
+        await ctx.reply(`📚 *No hay más libros para* "${autor}"`);
         return;
     }
     
     try {
-        const siguientePagina = await buscarPorAutorConPaginacion(busqueda.autor, 'es', offset);
+        const siguientePagina = await buscarPorAutorConPaginacion(autor, 'es', offset);
         let nuevosLibros = siguientePagina.libros;
         
         if (nuevosLibros.length === 0) {
-            const siguientePaginaEn = await buscarPorAutorConPaginacion(busqueda.autor, 'en', offset);
+            const siguientePaginaEn = await buscarPorAutorConPaginacion(autor, 'en', offset);
             nuevosLibros = siguientePaginaEn.libros;
         }
         
         if (nuevosLibros.length === 0) {
-            await ctx.reply(`📚 *No hay más libros para* "${busqueda.autor}"`, { parse_mode: 'Markdown' });
+            await ctx.answerCbQuery('No hay más libros');
             return;
         }
         
-        // Acumular libros
         const librosActualizados = [...busqueda.libros, ...nuevosLibros];
-        guardarLibrosPorAutor(busqueda.autor, librosActualizados);
+        guardarLibrosPorAutor(autor, librosActualizados);
         
-        const { mensaje, teclado } = formatearListaAutorConBotones(busqueda.autor, nuevosLibros, nuevaPagina, busqueda.totalLibros);
-        guardarBusqueda(usuarioId, busqueda.autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
+        const { mensaje, teclado } = formatearListaAutorConBotones(autor, nuevosLibros, nuevaPagina, busqueda.totalLibros);
+        guardarBusqueda(usuarioId, autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
+        
+        await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
         await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
         
     } catch (error) {
-        console.error(`❌ Error en /mas: ${error.message}`);
-        await ctx.reply(`⚠️ Error al cargar más libros. Intentá de nuevo.`, { parse_mode: 'Markdown' });
+        console.error(`❌ Error en paginación: ${error.message}`);
+        await ctx.answerCbQuery('Error al cargar');
     }
 });
 
-// ==================== CALLBACKS (botones) ====================
+// ==================== CALLBACK LIBROS ====================
 bot.action(/^libro_(\d+)$/, async (ctx) => {
     const numero = parseInt(ctx.match[1]);
     const usuarioId = ctx.from.id;
@@ -190,7 +261,7 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
     
     if (!busqueda) {
         await ctx.answerCbQuery('No tengo una lista activa');
-        await ctx.reply('❓ Primero buscá un autor con `/autor [nombre]`');
+        await ctx.reply('❓ Primero buscá un autor con `/autor [nombre]`', { parse_mode: 'Markdown' });
         return;
     }
     
@@ -210,42 +281,6 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
     
     await ctx.answerCbQuery(`📖 ${libro.titulo.substring(0, 50)}`);
     await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
-});
-
-// ==================== HANDLER_START ====================
-bot.command('start', async (ctx) => {
-    await ctx.reply(
-        '📖 ¡Bienvenido a PergaminosAbiertos!\n\n' +
-        'Soy PergaminosLibros_Bot. Te ayudo a encontrar libros en dominio público.\n\n' +
-        '🔹 COMANDOS:\n' +
-        '/autor [nombre]\n' +
-        '/buscar [nombre]\n' +
-        '/titulo [nombre]\n' +
-        '/help\n\n' +
-        '🔹 CÓMO USARLO:\n' +
-        '1. Escribí /autor + nombre (ej: /autor Jose Marti)\n' +
-        '2. Verás 5 libros con botones numéricos\n' +
-        '3. Tocá el número del libro que quieras\n' +
-        '4. Si hay más, tocá "📖 Más libros ➡️"\n\n' +
-        '⚠️ Los años de publicación pueden variar según biblioteca de origen.\n\n' +
-        '📌 100% legal. Solo dominio público.\n\n' +
-        '¡Empezá ahora!',
-        { parse_mode: 'HTML' }  // Cambiado de Markdown a HTML
-    );
-});
-
-// ==================== HANDLER_HELP ====================
-bot.command('help', async (ctx) => {
-    await ctx.reply(
-        '📖 Ayuda de PergaminosLibros_Bot\n\n' +
-        '🔍 Buscar autor:\n' +
-        '/autor Benito Perez Galdos\n' +
-        '/buscar Ruben Dario\n\n' +
-        '📱 Navegación:\n' +
-        '• Tocá los números azules para ver el libro\n' +
-        '• Escribí "más" para ver los siguientes 5 libros\n\n' +
-        '📚 Proyecto en crecimiento'
-    );
 });
 
 // ==================== HANDLERS_ADMIN ====================
