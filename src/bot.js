@@ -105,36 +105,52 @@ bot.command('start', async (ctx) => {
         '📖 ¡Bienvenido a PergaminosAbiertos!\n\n' +
         'Aquí encuentras libros en dominio público al instante.\n\n' +
         'Pruébalo ahora:\n' +
-        '<code>/autor Jose Marti</code>\n\n' +
+        '/autor Jose Marti\n\n' +
         '¿Ves los botones? Elige uno y el libro aparece.\n\n' +
-        '📘 ¿Dudas? Escribe /ayuda y te explico cómo leer o descargar.',
-        { parse_mode: 'HTML' }
+        '📘 ¿Dudas? Escribe /ayuda y te explico cómo leer o descargar.'
     );
 });
 
 // ==================== HANDLER_AYUDA ====================
 bot.command('ayuda', async (ctx) => {
     await ctx.reply(
-        '📘 <b>AYUDA DE PERGAMINOSLIBROS_BOT</b>\n\n' +
-        '🔹 <b>COMANDOS DISPONIBLES:</b>\n\n' +
-        '<code>/autor [nombre]</code>\n' +
-        'Ejemplo: <code>/autor Jose Marti</code>\n' +
-        '→ Búsqueda EXACTA por autor. Devuelve 5 libros.\n\n' +
-        '<code>/titulo [nombre]</code>\n' +
-        'Ejemplo: <code>/titulo El Principito</code>\n' +
-        '→ Búsqueda EXACTA por título.\n\n' +
-        '<code>/busqueda-amplia [nombre]</code>\n' +
-        'Ejemplo: <code>/busqueda-amplia Jose Marti</code>\n' +
+        '📘 AYUDA DE PERGAMINOSLIBROS_BOT\n\n' +
+        '🔹 COMANDOS DISPONIBLES:\n\n' +
+        '/autor [nombre]\n' +
+        'Ejemplo: /autor Jose Marti\n' +
+        '→ Búsqueda por autor. Devuelve 5 libros.\n\n' +
+        '/titulo [nombre]\n' +
+        'Ejemplo: /titulo El Principito\n' +
+        '→ Búsqueda por título.\n\n' +
+        '/busqueda-amplia [nombre]\n' +
+        'Ejemplo: /busqueda-amplia Jose Marti\n' +
         '→ Búsqueda AMPLIA en autor, título y descripción. Devuelve más resultados.\n\n' +
-        '🔹 <b>CÓMO FUNCIONA:</b>\n\n' +
+        '🔹 CÓMO FUNCIONA:\n\n' +
         '1. Usa cualquier comando\n' +
         '2. El bot te mostrará libros con botones numéricos\n' +
         '3. Toca el número del libro que quieras\n' +
         '4. Si hay más de 5, toca "📖 Siguientes 5 →"\n\n' +
-        '🔹 <b>¿PUEDO LEER O DESCARGAR?</b>\n\n' +
+        '🔹 ¿PUEDO LEER O DESCARGAR?\n\n' +
         'Sí. Cuando el bot te muestre un libro, toca "📖 Ver libro" y podrás leer online o descargar gratis.\n\n' +
-        '📌 <i>Los años de publicación pueden variar según biblioteca.</i>',
-        { parse_mode: 'HTML' }
+        '📌 Los años de publicación pueden variar según biblioteca.'
+    );
+});
+
+// ==================== HANDLER_BUSQUEDA_AMPLIA (temporal) ====================
+bot.command('busqueda-amplia', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1);
+    const query = args.join(' ');
+    
+    if (!query) {
+        await ctx.reply('❓ Usá: /busqueda-amplia [nombre]\n\nEjemplo: /busqueda-amplia Jose Marti');
+        return;
+    }
+    
+    await ctx.reply(
+        `🔍 Búsqueda amplia: "${query}"\n\n` +
+        `⚠️ Este comando estará disponible pronto.\n\n` +
+        `💡 Mientras tanto, probá con:\n` +
+        `/autor "${query}"`
     );
 });
 
