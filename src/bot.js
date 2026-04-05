@@ -122,8 +122,8 @@ bot.command('ayuda', async (ctx) => {
         '/titulo [nombre]\n' +
         'Ejemplo: /titulo El Principito\n' +
         '→ Búsqueda por título.\n\n' +
-        '/busqueda-amplia [nombre]\n' +
-        'Ejemplo: /busqueda-amplia Jose Marti\n' +
+        '/busqueda_amplia [nombre]\n' +
+        'Ejemplo: /busqueda_amplia Jose Marti\n' +
         '→ Búsqueda AMPLIA en autor, título y descripción. Devuelve más resultados.\n\n' +
         '🔹 CÓMO FUNCIONA:\n\n' +
         '1. Usa cualquier comando\n' +
@@ -137,12 +137,12 @@ bot.command('ayuda', async (ctx) => {
 });
 
 // ==================== HANDLER_BUSQUEDA_AMPLIA (temporal) ====================
-bot.command('busqueda-amplia', async (ctx) => {
+bot.command('busqueda_amplia', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1);
     const query = args.join(' ');
     
     if (!query) {
-        await ctx.reply('❓ Usá: /busqueda-amplia [nombre]\n\nEjemplo: /busqueda-amplia Jose Marti');
+        await ctx.reply('❓ Usá: /busqueda_amplia [nombre]\n\nEjemplo: /busqueda_amplia Jose Marti');
         return;
     }
     
