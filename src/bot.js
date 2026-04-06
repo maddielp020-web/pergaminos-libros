@@ -309,14 +309,16 @@ bot.action(/^mas_(.+)_(\d+)$/, async (ctx) => {
             return;
         }
         
+        // Actualizar la lista completa de libros
         const librosActualizados = [...busqueda.libros, ...nuevosLibros];
         guardarLibrosPorAutor(autor, librosActualizados);
         
-        const { mensaje, teclado } = formatearListaAutorConBotones(autor, nuevosLibros, nuevaPagina, busqueda.totalLibros);
+        // Usar librosActualizados (no nuevosLibros) para formatear
+        const { mensaje, teclado } = formatearListaAutorConBotones(autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
         guardarBusqueda(usuarioId, autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
         
         await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
-        await ctx.reply(mensaje, { parse_mode: 'Markdown', ...teclado });
+        await ctx.reply(mensaje, { ...teclado });
         
     } catch (error) {
         console.error(`❌ Error en paginación: ${error.message}`);
