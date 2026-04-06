@@ -146,7 +146,7 @@ async function buscarPorAutor(autor, idioma = 'es') {
         
         const response = await axios.get(url, {
             timeout: TIMEOUT_MS,
-            headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
+            headers: { 'User-Agent': 'PergaminosAbiertosBot (maddielp020@gmail.com)' }
         });
         
         if (!response.data || !response.data.docs || response.data.docs.length === 0) {
@@ -200,7 +200,7 @@ async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
         
         const response = await axios.get(url, {
             timeout: TIMEOUT_MS,
-            headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
+            headers: { 'User-Agent': 'PergaminosAbiertosBot (maddielp020@gmail.com)' }
         });
         
         if (!response.data || !response.data.docs || response.data.docs.length === 0) {
@@ -311,7 +311,7 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
         
         const response = await axios.get(url, {
             timeout: TIMEOUT_MS,
-            headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
+            headers: { 'User-Agent': 'PergaminosAbiertosBot (maddielp020@gmail.com)' }
         });
         
         if (!response.data || !response.data.docs || response.data.docs.length === 0) {
