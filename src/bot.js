@@ -180,15 +180,18 @@ async function buscarTituloPrincipal(ctx, titulo) {
         console.error(`❌ Error en Open Library (título): ${error.message}`);
     }
     
-    // No se encontraron resultados
+    // No se encontraron resultados - MENSAJE ACTUALIZADO según instrucciones del Chat de marketing
     let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
     mensaje += `No encontré libros con ese título.\n\n`;
-    mensaje += `📘 Sugerencias:\n`;
-    mensaje += `- Revisa la ortografía del título\n`;
-    mensaje += `- Prueba con palabras más cortas\n`;
+    mensaje += `📘 Posibles razones:\n`;
+    mensaje += `- El libro no está en dominio público\n`;
+    mensaje += `- El título tiene otra edición o traducción\n`;
+    mensaje += `- El libro está dentro de una colección o serie\n\n`;
+    mensaje += `🔍 Sugerencias:\n`;
     mensaje += `- Usa /autor si conoces el autor\n`;
-    mensaje += `- Escribe /ayuda para ver ejemplos\n\n`;
-    mensaje += `Ejemplo: /titulo El Principito`;
+    mensaje += `- Prueba con palabras más cortas del título\n`;
+    mensaje += `- Revisa la ortografía (tildes, mayúsculas)\n\n`;
+    mensaje += `📌 Ejemplo: /titulo Trafalgar`;
     
     await ctx.reply(mensaje);
 }
@@ -201,7 +204,8 @@ bot.command('start', async (ctx) => {
         'Pruébalo ahora:\n' +
         '/autor Jose Marti\n\n' +
         '¿Ves los botones? Elige uno y el libro aparece.\n\n' +
-        '📘 ¿Dudas? Escribe /ayuda y te explico cómo leer o descargar.'
+        '📘 ¿Dudas? Escribe /ayuda y te explico cómo leer o descargar.\n\n' +
+        '🔒 Solo mostramos libros en dominio público. Si no encuentras un título, puede que tenga derechos de autor.'
     );
 });
 
