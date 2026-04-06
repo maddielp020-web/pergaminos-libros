@@ -154,30 +154,95 @@ bot.command('busqueda_amplia', async (ctx) => {
     );
 });
 
-// ==================== HANDLER_AUTOR ====================
+// ==================== HANDLER_AUTOR (modificado) ====================
 bot.command('autor', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1);
     const query = args.join(' ');
     
     if (!query) {
-        await ctx.reply('❓ *Usá:* `/autor [nombre del autor]`\n\nEjemplo: `/autor Benito Perez Galdos`', { parse_mode: 'Markdown' });
+        await ctx.reply(
+            '❓ Usá: /autor [nombre del autor]\n\n' +
+            'Ejemplo: /autor Jose Marti'
+        );
         return;
     }
     
-    await buscarAutorPrincipal(ctx, query);
-});
-
-// ==================== HANDLER_BUSCAR ====================
-bot.command('buscar', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1);
-    const query = args.join(' ');
+    // Buscar el autor
+    const usuarioId = ctx.from.id;
+    let librosCache = obtenerLibrosPorAutor(query);
     
-    if (!query) {
-        await ctx.reply('❓ *Usá:* `/buscar [nombre del autor]`\n\nEjemplo: `/buscar Jose Marti`', { parse_mode: 'Markdown' });
+    if (librosCache && librosCache.length > 0) {
+        // Mostrar resultados encontrados
+        const primeros5 = librosCache.slice(0, 5);
+        const total = librosCache.length;
+        
+        let mensaje = `📚 BÚSQUEDA EXACTA POR AUTOR: "${query}"\n\n`;
+        mensaje += `(${total} libros encontrados)\n\n`;
+        
+        primeros5.forEach((libro, idx) => {
+            const numero = idx + 1;
+            const año = libro.anio ? ` (${libro.anio})` : '';
+            mensaje += `${numero}. ${libro.titulo}${año}\n`;
+        });
+        
+        mensaje += `\n👇 Toca el número del libro que quieres ver`;
+        
+        // Guardar sesión y enviar con botones
+        guardarBusqueda(usuarioId, query, librosCache, 0, total);
+        
+        const { teclado } = formatearListaAutorConBotones(query, primeros5, 0, total);
+        await ctx.reply(mensaje, { ...teclado });
         return;
     }
     
-    await buscarAutorPrincipal(ctx, query);
+    // Si no hay caché, buscar en Open Library
+    try {
+        const primeraPagina = await buscarPorAutorConPaginacion(query, 'es', 0);
+        let totalEncontrados = primeraPagina.totalEncontrados;
+        let libros = primeraPagina.libros;
+        
+        if (libros.length === 0) {
+            const primeraPaginaEn = await buscarPorAutorConPaginacion(query, 'en', 0);
+            libros = primeraPaginaEn.libros;
+            totalEncontrados = primeraPaginaEn.totalEncontrados;
+        }
+        
+        if (libros.length > 0) {
+            // Guardar en caché
+            guardarLibrosPorAutor(query, libros);
+            
+            const primeros5 = libros.slice(0, 5);
+            
+            let mensaje = `📚 BÚSQUEDA EXACTA POR AUTOR: "${query}"\n\n`;
+            mensaje += `(${totalEncontrados} libros encontrados)\n\n`;
+            
+            primeros5.forEach((libro, idx) => {
+                const numero = idx + 1;
+                const año = libro.anio ? ` (${libro.anio})` : '';
+                mensaje += `${numero}. ${libro.titulo}${año}\n`;
+            });
+            
+            mensaje += `\n👇 Toca el número del libro que quieres ver`;
+            
+            guardarBusqueda(usuarioId, query, libros, 0, totalEncontrados);
+            const { teclado } = formatearListaAutorConBotones(query, primeros5, 0, totalEncontrados);
+            await ctx.reply(mensaje, { ...teclado });
+            return;
+        }
+    } catch (error) {
+        console.error(`❌ Error en Open Library: ${error.message}`);
+    }
+    
+    // No se encontraron resultados
+    let mensaje = `📚 BÚSQUEDA EXACTA POR AUTOR: "${query}"\n\n`;
+    mensaje += `No encontré libros de ese autor.\n\n`;
+    mensaje += `📘 Sugerencias:\n`;
+    mensaje += `- Revisa la ortografía del nombre\n`;
+    mensaje += `- Prueba con /busqueda_amplia para buscar en todo el texto\n`;
+    mensaje += `- Escribe /ayuda para ver ejemplos\n\n`;
+    mensaje += `Ejemplo: /autor Jose Marti`;
+    
+    await ctx.reply(mensaje);
 });
 
 // ==================== HANDLER_TITULO (placeholder) ====================
@@ -199,22 +264,12 @@ bot.command('titulo', async (ctx) => {
     );
 });
 
-// ==================== HANDLER_BUSQUEDA_AMPLIA (placeholder) ====================
-bot.command('busqueda-amplia', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1);
-    const query = args.join(' ');
-    
-    if (!query) {
-        await ctx.reply('❓ *Usá:* `/busqueda-amplia [nombre]`\n\nEjemplo: `/busqueda-amplia Jose Marti`', { parse_mode: 'Markdown' });
-        return;
-    }
-    
+// ==================== HANDLER_BUSQUEDA_AMPLIA (temporal - Parte 2 vendrá después) ====================
+bot.command('busqueda_amplia', async (ctx) => {
     await ctx.reply(
-        `🔍 *Búsqueda amplia:* "${query}"\n\n` +
-        `⚠️ Esta función estará disponible pronto.\n\n` +
-        `💡 Mientras tanto, probá con:\n` +
-        `/autor "${query}"`,
-        { parse_mode: 'Markdown' }
+        '🔍 Búsqueda amplia\n\n' +
+        'Este comando estará disponible pronto.\n\n' +
+        '📘 Mientras tanto, usá /autor para buscar por autor exacto.'
     );
 });
 
