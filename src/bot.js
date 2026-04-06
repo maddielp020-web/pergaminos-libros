@@ -99,6 +99,100 @@ async function buscarAutorPrincipal(ctx, autor) {
     await ctx.reply(`📚 *No encontré libros para* "${autor}"\n\n💡 Probá con otro nombre.`, { parse_mode: 'Markdown' });
 }
 
+// ==================== BUSCAR_TITULO_PRINCIPAL ====================
+async function buscarTituloPrincipal(ctx, titulo) {
+    console.log(`🔍 Buscando título: "${titulo}"`);
+    const usuarioId = ctx.from.id;
+    
+    // Verificar caché local (usando la misma estructura, pero con clave de título)
+    let librosCache = obtenerLibrosPorAutor(`titulo_${titulo}`); // Namespace diferente
+    
+    if (librosCache && librosCache.length > 0) {
+        const primeros5 = librosCache.slice(0, 5);
+        const total = librosCache.length;
+        
+        let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
+        mensaje += `(${total} libros encontrados)\n\n`;
+        
+        primeros5.forEach((libro, idx) => {
+            const numero = idx + 1;
+            const año = libro.anio ? ` (${libro.anio})` : '';
+            mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
+        });
+        
+        mensaje += `\n👇 Toca el número del libro que quieres ver`;
+        
+        guardarBusqueda(usuarioId, `titulo_${titulo}`, librosCache, 0, total);
+        const { teclado } = formatearListaAutorConBotones(titulo, primeros5, 0, total);
+        await ctx.reply(mensaje, { ...teclado });
+        return;
+    }
+    
+    // Buscar en Open Library por título
+    try {
+        const libros = await buscarPorTitulo(titulo, 'es');
+        
+        if (libros.length === 0) {
+            const librosEn = await buscarPorTitulo(titulo, 'en');
+            if (librosEn.length > 0) {
+                guardarLibrosPorAutor(`titulo_${titulo}`, librosEn);
+                const primeros5 = librosEn.slice(0, 5);
+                
+                let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
+                mensaje += `(${librosEn.length} libros encontrados)\n\n`;
+                
+                primeros5.forEach((libro, idx) => {
+                    const numero = idx + 1;
+                    const año = libro.anio ? ` (${libro.anio})` : '';
+                    mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
+                });
+                
+                mensaje += `\n👇 Toca el número del libro que quieres ver`;
+                
+                guardarBusqueda(usuarioId, `titulo_${titulo}`, librosEn, 0, librosEn.length);
+                const { teclado } = formatearListaAutorConBotones(titulo, primeros5, 0, librosEn.length);
+                await ctx.reply(mensaje, { ...teclado });
+                return;
+            }
+        }
+        
+        if (libros.length > 0) {
+            guardarLibrosPorAutor(`titulo_${titulo}`, libros);
+            const primeros5 = libros.slice(0, 5);
+            
+            let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
+            mensaje += `(${libros.length} libros encontrados)\n\n`;
+            
+            primeros5.forEach((libro, idx) => {
+                const numero = idx + 1;
+                const año = libro.anio ? ` (${libro.anio})` : '';
+                mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
+            });
+            
+            mensaje += `\n👇 Toca el número del libro que quieres ver`;
+            
+            guardarBusqueda(usuarioId, `titulo_${titulo}`, libros, 0, libros.length);
+            const { teclado } = formatearListaAutorConBotones(titulo, primeros5, 0, libros.length);
+            await ctx.reply(mensaje, { ...teclado });
+            return;
+        }
+    } catch (error) {
+        console.error(`❌ Error en Open Library (título): ${error.message}`);
+    }
+    
+    // No se encontraron resultados
+    let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
+    mensaje += `No encontré libros con ese título.\n\n`;
+    mensaje += `📘 Sugerencias:\n`;
+    mensaje += `- Revisa la ortografía del título\n`;
+    mensaje += `- Prueba con palabras más cortas\n`;
+    mensaje += `- Usa /autor si conoces el autor\n`;
+    mensaje += `- Escribe /ayuda para ver ejemplos\n\n`;
+    mensaje += `Ejemplo: /titulo El Principito`;
+    
+    await ctx.reply(mensaje);
+}
+
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
     await ctx.reply(
@@ -245,23 +339,20 @@ bot.command('autor', async (ctx) => {
     await ctx.reply(mensaje);
 });
 
-// ==================== HANDLER_TITULO (placeholder) ====================
+// ==================== HANDLER_TITULO ====================
 bot.command('titulo', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1);
     const query = args.join(' ');
     
     if (!query) {
-        await ctx.reply('❓ *Usá:* `/titulo [nombre del libro]`\n\nEjemplo: `/titulo El Principito`', { parse_mode: 'Markdown' });
+        await ctx.reply(
+            '❓ Escribe /titulo seguido del nombre del libro.\n\n' +
+            'Ejemplo: /titulo El Principito'
+        );
         return;
     }
     
-    await ctx.reply(
-        `📖 *Buscando:* "${query}"\n\n` +
-        `⚠️ La búsqueda por título estará disponible pronto.\n\n` +
-        `💡 Mientras tanto, probá con:\n` +
-        `/autor "${query}"`,
-        { parse_mode: 'Markdown' }
-    );
+    await buscarTituloPrincipal(ctx, query);
 });
 
 // ==================== HANDLER_BUSQUEDA_AMPLIA (temporal - Parte 2 vendrá después) ====================
@@ -334,7 +425,7 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
     
     if (!busqueda) {
         await ctx.answerCbQuery('No tengo una lista activa');
-        await ctx.reply('❓ Primero buscá un autor con `/autor [nombre]`', { parse_mode: 'Markdown' });
+        await ctx.reply('❓ Primero buscá un autor con /autor [nombre] o un título con /titulo [nombre]');
         return;
     }
     
