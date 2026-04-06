@@ -371,10 +371,100 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
     }
 }
 
+// ==================== FUNCION_BUSQUEDA_AMPLIA ====================
+/**
+ * Búsqueda amplia en Open Library (título, autor, temas)
+ * @param {string} query - Término de búsqueda
+ * @returns {Promise<Object>} { libros, total }
+ */
+async function buscarAmplia(query) {
+    console.log(`🔍 [Open Library] Búsqueda amplia: "${query}"`);
+    
+    if (!query || query.trim().length < 2) {
+        return { libros: [], total: 0 };
+    }
+    
+    const queryLimpia = query.trim();
+    
+    try {
+        // User-Agent requerido por Open Library
+        const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(queryLimpia)}&public_scan_b=true&limit=20`;
+        console.log(`   📡 URL: ${url}`);
+        
+        const response = await axios.get(url, {
+            timeout: TIMEOUT_MS,
+            headers: { 
+                'User-Agent': 'PergaminosAbiertosBot (maddielp020@gmail.com)' 
+            }
+        });
+        
+        if (!response.data || !response.data.docs || response.data.docs.length === 0) {
+            console.log(`   ⚠️ Sin resultados en búsqueda amplia: "${query}"`);
+            return { libros: [], total: 0 };
+        }
+        
+        const docs = response.data.docs;
+        const total = response.data.numFound || docs.length;
+        console.log(`   📚 Open Library devolvió ${docs.length} documentos (total: ${total})`);
+        
+        const librosFormateados = docs.map(item => {
+            // Extraer subjects (temas) - máximo 3 para no saturar
+            let subjects = [];
+            if (item.subject && Array.isArray(item.subject)) {
+                subjects = item.subject.slice(0, 3);
+            }
+            
+            // Obtener año
+            let anio = null;
+            if (item.first_publish_year) {
+                anio = item.first_publish_year;
+            } else if (item.publish_year && Array.isArray(item.publish_year) && item.publish_year.length > 0) {
+                anio = item.publish_year[0];
+            }
+            
+            // Obtener autor
+            const autor = item.author_name && item.author_name.length > 0 
+                ? item.author_name[0] 
+                : 'Autor desconocido';
+            
+            // Construir enlace HTML
+            let enlaceHTML = null;
+            if (item.key) {
+                enlaceHTML = `https://openlibrary.org${item.key}`;
+            }
+            
+            return {
+                id: item.key,
+                titulo: item.title || 'Sin título',
+                autor: autor,
+                anio: anio,
+                subjects: subjects,
+                enlaceHTML: enlaceHTML,
+                enlaceEPUB: null,
+                fuente: 'Open Library'
+            };
+        });
+        
+        console.log(`   ✅ [Open Library] Búsqueda amplia: ${librosFormateados.length} libros`);
+        return { libros: librosFormateados, total: total };
+        
+    } catch (error) {
+        if (error.code === 'ECONNABORTED') {
+            console.error(`   ⏰ Timeout en búsqueda amplia: "${query}"`);
+        } else if (error.response) {
+            console.error(`   ❌ Open Library error ${error.response.status}`);
+        } else {
+            console.error(`   ❌ Open Library error: ${error.message}`);
+        }
+        return { libros: [], total: 0 };
+    }
+}
+
 // ==================== EXPORTS ====================
 module.exports = {
     buscarPorAutor,
     buscarPorTitulo,
     buscarPorAutorConPaginacion,
-    buscarTodosLosLibrosPorAutor   // NUEVA función para traer TODOS los libros
+    buscarTodosLosLibrosPorAutor,
+    buscarAmplia  // ← CORRECTO: sin acento, con "c"
 };
