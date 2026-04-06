@@ -118,7 +118,7 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
         
         const response = await axios.get(url, {
             timeout: TIMEOUT_MS,
-            headers: { 'User-Agent': 'PergaminosLibros_Bot/1.0' }
+            headers: { 'User-Agent': 'PergaminosAbiertosBot (maddielp020@gmail.com)' }
         });
         
         console.log(`   📊 Status: ${response.status}`);
