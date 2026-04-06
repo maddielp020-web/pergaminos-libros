@@ -7,10 +7,10 @@ function formatearListaAutorConBotones(autor, libros, pagina = 0, total = null) 
     const fin = inicio + 5;
     const librosPagina = libros.slice(inicio, fin);
     const totalLibros = total || libros.length;
-    const paginaActualNum = pagina + 1;
     const totalPaginas = Math.ceil(totalLibros / 5);
     
-    let mensaje = `📚 *${autor}* (${totalLibros} libros encontrados)\n\n`;
+    let mensaje = `📚 BÚSQUEDA EXACTA POR AUTOR: "${autor}"\n\n`;
+    mensaje += `(${totalLibros} libros encontrados)\n\n`;
     
     librosPagina.forEach((libro, idx) => {
         const numero = inicio + idx + 1;
@@ -18,9 +18,7 @@ function formatearListaAutorConBotones(autor, libros, pagina = 0, total = null) 
         mensaje += `${numero}. ${libro.titulo}${año}\n`;
     });
     
-    mensaje += `\n👇 *Toque el número del libro que quiere ver*\n`;
-    mensaje += `📌 Para ver más: escriba *"más"*\n`;
-    mensaje += `🔍 Para buscar otro autor: /autor [nombre]`;
+    mensaje += `\n👇 Toca el número del libro que quieres ver`;
     
     // Crear botones: 1 2 3 4 5 en una fila
     const botones = [];
@@ -29,14 +27,14 @@ function formatearListaAutorConBotones(autor, libros, pagina = 0, total = null) 
         botones.push(Markup.button.callback(`${numero}`, `libro_${numero}`));
     }
     
-    // Si hay más páginas, añadir botón "Más ➡️"
+    // Si hay más páginas, añadir botón "📖 Siguientes 5 →"
     const filas = [];
     if (botones.length > 0) {
         filas.push(botones);
     }
     if (pagina + 1 < totalPaginas) {
-    filas.push([Markup.button.callback('📖 Siguientes 5 →', `mas_${autor}_${pagina + 1}`)]);
-}
+        filas.push([Markup.button.callback('📖 Siguientes 5 →', `mas_${autor}_${pagina + 1}`)]);
+    }
     
     const teclado = Markup.inlineKeyboard(filas);
     
@@ -58,7 +56,7 @@ function formatearLibroUnicoConBotones(libro, mostrarComandos = true) {
         mensaje += `${libro.descripcion}\n\n`;
     }
     
-    // Mostrar enlaces de dominio público (asumimos que todo lo que llega de Open Library con public_scan_b=true es dominio público)
+    // Mostrar enlaces de dominio público
     if (libro.enlaceHTML) {
         mensaje += `🌐 *Leer online:* [Versión web](${libro.enlaceHTML})\n`;
     }
@@ -101,26 +99,10 @@ function obtenerMensajeEspecial(query) {
     return null;
 }
 
-// ==================== FUNCION_FORMATEAR_LISTA_AUTOR_PAGINADA ====================
-function formatearListaAutorPaginada(autor, libros, inicio, total) {
-    let mensaje = `📚 *${autor}* (libros ${inicio}-${Math.min(inicio + libros.length - 1, total)} de ${total})\n\n`;
-    
-    libros.forEach((libro, idx) => {
-        const numero = inicio + idx;
-        const año = libro.anio ? ` (${libro.anio})` : '';
-        mensaje += `${numero}. ${libro.titulo}${año}\n`;
-    });
-    
-    mensaje += `\n👉 Escriba *"más"* para seguir viendo libros de ${autor}.`;
-    
-    return mensaje;
-}
-
 // ==================== EXPORTS ====================
 module.exports = {
     formatearListaAutorConBotones,
     formatearLibroUnicoConBotones,
     formatearErrorGutendex,
-    obtenerMensajeEspecial,
-    formatearListaAutorPaginada
+    obtenerMensajeEspecial
 };
