@@ -1,7 +1,7 @@
 // ==================== IMPORTACIONES ====================
 const { Telegraf } = require('telegraf');
 const { BOT_TOKEN } = require('./config');
-const { buscarPorAutor, buscarPorTitulo } = require('./buscar/gutendex');
+const { buscarPorAutor, buscarPorTitulo, normalizarTexto } = require('./buscar/gutendex');
 const { formatearListaAutorConBotones, formatearLibroUnicoConBotones, obtenerMensajeEspecial } = require('./mensajes/formatear');
 const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
 const {
@@ -104,8 +104,12 @@ async function buscarTituloPrincipal(ctx, titulo) {
     console.log(`🔍 Buscando título: "${titulo}"`);
     const usuarioId = ctx.from.id;
     
-    // Verificar caché local (usando la misma estructura, pero con clave de título)
-    let librosCache = obtenerLibrosPorAutor(`titulo_${titulo}`); // Namespace diferente
+    // Normalizar el título para búsqueda
+    const tituloNormalizado = normalizarTexto(titulo);
+    console.log(`   📝 Título normalizado: "${tituloNormalizado}"`);
+    
+    // Verificar caché local (usar el título normalizado como clave)
+    let librosCache = obtenerLibrosPorAutor(`titulo_${tituloNormalizado}`);
     
     if (librosCache && librosCache.length > 0) {
         const primeros5 = librosCache.slice(0, 5);
@@ -122,20 +126,20 @@ async function buscarTituloPrincipal(ctx, titulo) {
         
         mensaje += `\n👇 Toca el número del libro que quieres ver`;
         
-        guardarBusqueda(usuarioId, `titulo_${titulo}`, librosCache, 0, total);
-        const { teclado } = formatearListaAutorConBotones(titulo, primeros5, 0, total);
+        guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, librosCache, 0, total);
+        const { teclado } = formatearListaAutorConBotones(tituloNormalizado, primeros5, 0, total);
         await ctx.reply(mensaje, { ...teclado });
         return;
     }
     
     // Buscar en Open Library por título
     try {
-        const libros = await buscarPorTitulo(titulo, 'es');
+        const libros = await buscarPorTitulo(tituloNormalizado, 'es');
         
         if (libros.length === 0) {
-            const librosEn = await buscarPorTitulo(titulo, 'en');
+            const librosEn = await buscarPorTitulo(tituloNormalizado, 'en');
             if (librosEn.length > 0) {
-                guardarLibrosPorAutor(`titulo_${titulo}`, librosEn);
+                guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, librosEn);
                 const primeros5 = librosEn.slice(0, 5);
                 
                 let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
@@ -149,15 +153,15 @@ async function buscarTituloPrincipal(ctx, titulo) {
                 
                 mensaje += `\n👇 Toca el número del libro que quieres ver`;
                 
-                guardarBusqueda(usuarioId, `titulo_${titulo}`, librosEn, 0, librosEn.length);
-                const { teclado } = formatearListaAutorConBotones(titulo, primeros5, 0, librosEn.length);
+                guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, librosEn, 0, librosEn.length);
+                const { teclado } = formatearListaAutorConBotones(tituloNormalizado, primeros5, 0, librosEn.length);
                 await ctx.reply(mensaje, { ...teclado });
                 return;
             }
         }
         
         if (libros.length > 0) {
-            guardarLibrosPorAutor(`titulo_${titulo}`, libros);
+            guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, libros);
             const primeros5 = libros.slice(0, 5);
             
             let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
@@ -171,8 +175,8 @@ async function buscarTituloPrincipal(ctx, titulo) {
             
             mensaje += `\n👇 Toca el número del libro que quieres ver`;
             
-            guardarBusqueda(usuarioId, `titulo_${titulo}`, libros, 0, libros.length);
-            const { teclado } = formatearListaAutorConBotones(titulo, primeros5, 0, libros.length);
+            guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, libros, 0, libros.length);
+            const { teclado } = formatearListaAutorConBotones(tituloNormalizado, primeros5, 0, libros.length);
             await ctx.reply(mensaje, { ...teclado });
             return;
         }
