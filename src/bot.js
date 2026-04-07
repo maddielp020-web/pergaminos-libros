@@ -237,12 +237,14 @@ bot.command('autor', async (ctx) => {
     const query = args.join(' ');
     
     if (!query) {
-        await ctx.reply(
-            '❓ Usá: /autor [nombre del autor]\n\n' +
-            'Ejemplo: /autor Jose Marti'
-        );
-        return;
-    }
+    await ctx.reply(
+        '📖 Dame un nombre y te ayudo.\n\n' +
+        'Escribe /autor seguido del autor que te interesa.\n\n' +
+        'Por ejemplo: /autor Jose Marti\n\n' +
+        'Así encuentro sus libros en dominio público. 📚'
+    );
+    return;
+}
     
     // Buscar el autor
     const usuarioId = ctx.from.id;
@@ -328,12 +330,14 @@ bot.command('titulo', async (ctx) => {
     const query = args.join(' ');
     
     if (!query) {
-        await ctx.reply(
-            '❓ Escribe /titulo seguido del nombre del libro.\n\n' +
-            'Ejemplo: /titulo El Principito'
-        );
-        return;
-    }
+    await ctx.reply(
+        '📖 Dame un título y lo busco.\n\n' +
+        'Escribe /titulo seguido del libro que quieres leer.\n\n' +
+        'Por ejemplo: /titulo El Principito\n\n' +
+        'Así reviso si está en dominio público para ti. 📚'
+    );
+    return;
+}
     
     await buscarTituloPrincipal(ctx, query);
 });
