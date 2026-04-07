@@ -15,8 +15,8 @@ const {
 // Sesiones temporales para feedback
 global.feedbackSesiones = new Map();
 
-// NOTA: ID_CREADOR ya está definido en este archivo (2022025893)
-// NO lo definas de nuevo. Solo úsalo cuando envíes feedback.
+// Cache en memoria para resultados de búsqueda
+const busquedasUsuario = new Map();
 
 // ==================== EXTRAER PALABRAS CLAVE ====================
 function extraerPalabrasClave(frase) {
