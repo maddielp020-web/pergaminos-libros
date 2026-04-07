@@ -15,9 +15,6 @@ const {
 // Sesiones temporales para feedback
 global.feedbackSesiones = new Map();
 
-// Cache en memoria para resultados de búsqueda
-const busquedasUsuario = new Map();
-
 // ==================== EXTRAER PALABRAS CLAVE ====================
 function extraerPalabrasClave(frase) {
     // Palabras muy cortas o comunes que se ignoran
