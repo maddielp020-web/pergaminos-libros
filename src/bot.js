@@ -419,7 +419,7 @@ bot.action(/^mas_autor_(.+)_(\d+)$/, async (ctx) => {
         return;
     }
     
-    const nuevaPagina = paginaActual + 1;
+    const nuevaPagina = paginaActual;
     const offset = nuevaPagina * 5;
     
     if (offset >= busqueda.totalLibros) {
@@ -471,7 +471,7 @@ bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
         return;
     }
     
-    const nuevaPagina = paginaActual + 1;
+    const nuevaPagina = paginaActual;
     const offset = nuevaPagina * 5;
     
     if (offset >= busqueda.totalLibros) {
@@ -480,8 +480,7 @@ bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
         return;
     }
     
-    const librosActualizados = busqueda.libros;
-    const librosPagina = librosActualizados.slice(offset, offset + 5);
+    const librosPagina = busqueda.libros.slice(offset, offset + 5);
     
     if (librosPagina.length === 0) {
         await ctx.answerCbQuery('No hay más libros');
@@ -503,12 +502,12 @@ bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
     if (offset + 5 < busqueda.totalLibros) {
         teclado.reply_markup = {
             inline_keyboard: [
-                [{ text: '📖 Ver más títulos', callback_data: `mas_titulo_${titulo}_${nuevaPagina}` }]
+                [{ text: '📖 Ver más títulos', callback_data: `mas_titulo_${titulo}_${nuevaPagina + 1}` }]
             ]
         };
     }
     
-    guardarBusqueda(usuarioId, claveBusqueda, librosActualizados, nuevaPagina, busqueda.totalLibros);
+    guardarBusqueda(usuarioId, claveBusqueda, busqueda.libros, nuevaPagina, busqueda.totalLibros);
     
     await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
     await ctx.reply(mensaje, { ...teclado });
