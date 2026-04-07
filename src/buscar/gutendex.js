@@ -264,10 +264,40 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
     return [];
 }
 
+// ==================== FUNCION_NORMALIZAR_TEXTO ====================
+/**
+ * Normaliza un texto para búsqueda: minúsculas, sin tildes, sin artículos iniciales
+ * @param {string} texto - Texto a normalizar
+ * @returns {string} Texto normalizado
+ */
+function normalizarTexto(texto) {
+    if (!texto) return '';
+    
+    let normalizado = texto.toLowerCase().trim();
+    
+    // Eliminar tildes
+    const reemplazos = {
+        'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+        'ü': 'u', 'ñ': 'n', 'Á': 'a', 'É': 'e', 'Í': 'i',
+        'Ó': 'o', 'Ú': 'u', 'Ü': 'u', 'Ñ': 'n'
+    };
+    normalizado = normalizado.replace(/[áéíóúüñÁÉÍÓÚÜÑ]/g, match => reemplazos[match] || match);
+    
+    // Eliminar artículos comunes al inicio
+    const articulos = /^(el |la |los |las |un |una |unos |unas )/;
+    normalizado = normalizado.replace(articulos, '');
+    
+    // Eliminar espacios extra
+    normalizado = normalizado.trim().replace(/\s+/g, ' ');
+    
+    return normalizado;
+}
+
 // ==================== EXPORTS ====================
 module.exports = {
     buscarPorAutor,
     buscarPorTitulo,
     normalizarConsulta,
-    normalizarTitulo
+    normalizarTitulo,
+    normalizarTexto  // ← NUEVA
 };
