@@ -473,6 +473,50 @@ bot.command('titulo', async (ctx) => {
     await buscarTituloPrincipal(ctx, query);
 });
 
+// ==================== BOTÓN VER MÁS TÍTULOS ====================
+bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
+    let titulo = ctx.match[1];
+    const paginaActual = parseInt(ctx.match[2]);
+    const usuarioId = ctx.from.id;
+    
+    // Decodificar el título (convertir %20 a espacios)
+    titulo = decodeURIComponent(titulo);
+    const claveBusqueda = `titulo_${titulo}`;
+    const busqueda = obtenerBusqueda(usuarioId);
+    
+    if (!busqueda || busqueda.autor !== claveBusqueda) {
+        await ctx.answerCbQuery('Búsqueda no encontrada');
+        await ctx.reply(`❓ Primero buscá el título con: /titulo ${titulo}`);
+        return;
+    }
+    
+    const nuevaPagina = paginaActual;
+    const offset = nuevaPagina * 5;
+    
+    if (offset >= busqueda.totalLibros) {
+        await ctx.answerCbQuery('No hay más libros');
+        await ctx.reply(`📚 *No hay más títulos para* "${titulo}"`);
+        return;
+    }
+    
+    const librosPagina = busqueda.libros.slice(offset, offset + 5);
+    
+    if (librosPagina.length === 0) {
+        await ctx.answerCbQuery('No hay más libros');
+        return;
+    }
+    
+    let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
+    mensaje += `(${busqueda.totalLibros} libros encontrados)\n\n`;
+    
+    librosPagina.forEach((libro, idx) => {
+        const numero = offset + idx + 1;
+        const año = libro.anio ? ` (${libro.anio})` : '';
+        mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
+    });
+    
+    mensaje += `\n👇 Toca el número del libro que quieres ver`;
+
 // ==================== BOTÓN VER MÁS LIBROS (AUTOR) ====================
 bot.action(/^mas_autor_(.+)_(\d+)$/, async (ctx) => {
     const autor = ctx.match[1];
@@ -523,50 +567,6 @@ bot.action(/^mas_autor_(.+)_(\d+)$/, async (ctx) => {
         await ctx.answerCbQuery('Error al cargar');
     }
 });
-
-// ==================== BOTÓN VER MÁS TÍTULOS ====================
-bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
-    let titulo = ctx.match[1];
-    const paginaActual = parseInt(ctx.match[2]);
-    const usuarioId = ctx.from.id;
-    
-    // Decodificar el título (convertir %20 a espacios)
-    titulo = decodeURIComponent(titulo);
-    const claveBusqueda = `titulo_${titulo}`;
-    const busqueda = obtenerBusqueda(usuarioId);
-    
-    if (!busqueda || busqueda.autor !== claveBusqueda) {
-        await ctx.answerCbQuery('Búsqueda no encontrada');
-        await ctx.reply(`❓ Primero buscá el título con: /titulo ${titulo}`);
-        return;
-    }
-    
-    const nuevaPagina = paginaActual;
-    const offset = nuevaPagina * 5;
-    
-    if (offset >= busqueda.totalLibros) {
-        await ctx.answerCbQuery('No hay más libros');
-        await ctx.reply(`📚 *No hay más títulos para* "${titulo}"`);
-        return;
-    }
-    
-    const librosPagina = busqueda.libros.slice(offset, offset + 5);
-    
-    if (librosPagina.length === 0) {
-        await ctx.answerCbQuery('No hay más libros');
-        return;
-    }
-    
-    let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
-    mensaje += `(${busqueda.totalLibros} libros encontrados)\n\n`;
-    
-    librosPagina.forEach((libro, idx) => {
-        const numero = offset + idx + 1;
-        const año = libro.anio ? ` (${libro.anio})` : '';
-        mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
-    });
-    
-    mensaje += `\n👇 Toca el número del libro que quieres ver`;
     
     // ==================== TECLADO_PAGINACION_TITULOS ====================
 const botonesNumericos = [];
