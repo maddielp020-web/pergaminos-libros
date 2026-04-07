@@ -36,8 +36,17 @@ console.log('🤖 Iniciando bot de Telegram...');
 // Importar bot después del servidor
 const bot = require('./src/bot');
 
-// Función para iniciar el bot de forma segura
+// Variable global para evitar múltiples inicios
+let botIniciado = false;
+
+// Función para iniciar el bot de forma segura (SOLO UNA VEZ)
 const iniciarBotSeguro = async () => {
+    // Evitar ejecutar si ya se inició
+    if (botIniciado) {
+        console.log('⚠️ El bot ya está iniciado, ignorando llamada duplicada');
+        return;
+    }
+    
     try {
         // Paso 1: Limpiar webhook completo
         await bot.telegram.deleteWebhook({ drop_pending_updates: true });
@@ -53,6 +62,7 @@ const iniciarBotSeguro = async () => {
             dropPendingUpdates: true
         });
         
+        botIniciado = true;
         console.log('✅ Bot de Telegram iniciado correctamente');
         console.log('📍 Modo: Long Polling (sin conflictos)');
         console.log('🎯 Comandos disponibles: /start, /autor, /buscar, /titulo, /help');
@@ -62,20 +72,24 @@ const iniciarBotSeguro = async () => {
         if (err.response) {
             console.error('   Detalle:', err.response.description);
         }
-        process.exit(1);
+        // No salimos con process.exit(1) para evitar reinicios en bucle
+        console.log('⚠️ El bot no se inició, pero el servidor HTTP sigue funcionando');
     }
 };
 
 // Arrancar el servidor HTTP
+let serverIniciado = false;
 const server = app.listen(PORT, '0.0.0.0', () => {
+    if (serverIniciado) return;
+    serverIniciado = true;
+    
     console.log(`🌐 Servidor HTTP escuchando en puerto: ${PORT}`);
     console.log(`   📍 Health check: http://0.0.0.0:${PORT}/health`);
     
-    // Una vez que el servidor está corriendo, iniciar el bot
-    // Esto evita el error 409 porque el servidor ya está completamente listo
+    // Iniciar el bot solo una vez, después de que el servidor esté listo
     setTimeout(() => {
         iniciarBotSeguro();
-    }, 2000); // Esperar 2 segundos extra para estar seguros
+    }, 2000);
 });
 
 // ==================== MANEJO_ERRORES ====================
