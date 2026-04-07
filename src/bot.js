@@ -220,9 +220,6 @@ bot.command('ayuda', async (ctx) => {
         '/titulo [nombre]\n' +
         'Ejemplo: /titulo El Principito\n' +
         '→ Búsqueda por título.\n\n' +
-        '/busqueda_amplia [nombre]\n' +
-        'Ejemplo: /busqueda_amplia Jose Marti\n' +
-        '→ Búsqueda AMPLIA en autor, título y descripción. Devuelve más resultados.\n\n' +
         '🔹 CÓMO FUNCIONA:\n\n' +
         '1. Usa cualquier comando\n' +
         '2. El bot te mostrará libros con botones numéricos\n' +
