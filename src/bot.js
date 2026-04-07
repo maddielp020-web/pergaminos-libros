@@ -459,9 +459,12 @@ bot.action(/^mas_autor_(.+)_(\d+)$/, async (ctx) => {
 
 // ==================== BOTÓN VER MÁS TÍTULOS ====================
 bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
-    const titulo = ctx.match[1];
+    let titulo = ctx.match[1];
     const paginaActual = parseInt(ctx.match[2]);
     const usuarioId = ctx.from.id;
+    
+    // Decodificar el título (convertir %20 a espacios)
+    titulo = decodeURIComponent(titulo);
     const claveBusqueda = `titulo_${titulo}`;
     const busqueda = obtenerBusqueda(usuarioId);
     
@@ -502,7 +505,7 @@ bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
     if (offset + 5 < busqueda.totalLibros) {
         teclado.reply_markup = {
             inline_keyboard: [
-                [{ text: '📖 Ver más títulos', callback_data: `mas_titulo_${titulo}_${nuevaPagina + 1}` }]
+                [{ text: '📖 Ver más títulos', callback_data: `mas_titulo_${encodeURIComponent(titulo)}_${nuevaPagina + 1}` }]
             ]
         };
     }
