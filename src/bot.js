@@ -221,17 +221,35 @@ async function buscarTituloPrincipal(ctx, titulo) {
             
             guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, libros, 0, total);
             
-            // Crear teclado manual para títulos
-            let teclado = {};
-            if (total > 5) {
-                teclado = {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '📖 Ver más títulos', callback_data: `mas_titulo_${encodeURIComponent(titulo)}_0` }]
-                        ]
-                    }
-                };
-            }
+            // ==================== CREAR_TECLADO_TITULOS ====================
+// Crear teclado con botones numéricos para títulos
+const botonesNumericos = [];
+const maxBotones = Math.min(primeros5.length, 5);
+
+// Crear fila de botones numéricos
+for (let i = 0; i < maxBotones; i++) {
+    botonesNumericos.push({
+        text: `${i + 1}`,
+        callback_data: `libro_${i + 1}`
+    });
+}
+
+const inline_keyboard = [];
+inline_keyboard.push(botonesNumericos);
+
+// Agregar botón "Ver más títulos" si hay más de 5
+if (total > 5) {
+    inline_keyboard.push([{ 
+        text: '📖 Ver más títulos', 
+        callback_data: `mas_titulo_${encodeURIComponent(titulo)}_0` 
+    }]);
+}
+
+const teclado = {
+    reply_markup: { inline_keyboard }
+};
+
+await ctx.reply(mensaje, { ...teclado });
             
             await ctx.reply(mensaje, { ...teclado });
             
@@ -240,6 +258,55 @@ async function buscarTituloPrincipal(ctx, titulo) {
     } catch (error) {
         console.error(`❌ Error en Open Library (título): ${error.message}`);
     }
+    
+    // ==================== FALLBACK_GUTENDEX_TITULO ====================
+try {
+    console.log(`🔄 Intentando Gutendex para título: "${tituloNormalizado}"`);
+    let librosGutendex = await buscarPorTituloGutendex(tituloNormalizado, 'es');
+    
+    if (librosGutendex.length === 0) {
+        librosGutendex = await buscarPorTituloGutendex(tituloNormalizado, 'en');
+    }
+    
+    if (librosGutendex.length > 0) {
+        guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, librosGutendex);
+        const primeros5 = librosGutendex.slice(0, 5);
+        const total = librosGutendex.length;
+        
+        let mensaje = `📚 BÚSQUEDA POR TÍTULO (Gutendex): "${titulo}"\n\n`;
+        mensaje += `(${total} libros encontrados)\n\n`;
+        
+        primeros5.forEach((libro, idx) => {
+            const numero = idx + 1;
+            const año = libro.anio ? ` (${libro.anio})` : '';
+            mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
+        });
+        
+        mensaje += `\n👇 Toca el número del libro que quieres ver`;
+        
+        guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, librosGutendex, 0, total);
+        
+        // Crear teclado con botones numéricos
+        const botonesNumericos = [];
+        for (let i = 0; i < primeros5.length; i++) {
+            botonesNumericos.push({ text: `${i + 1}`, callback_data: `libro_${i + 1}` });
+        }
+        
+        const inline_keyboard = [botonesNumericos];
+        if (total > 5) {
+            inline_keyboard.push([{ 
+                text: '📖 Ver más títulos', 
+                callback_data: `mas_titulo_${encodeURIComponent(titulo)}_0` 
+            }]);
+        }
+        
+        const teclado = { reply_markup: { inline_keyboard } };
+        await ctx.reply(mensaje, { ...teclado });
+        return;
+    }
+} catch (error) {
+    console.error(`❌ Error en Gutendex (título): ${error.message}`);
+}
     
     // No se encontraron resultados
     let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
@@ -501,14 +568,31 @@ bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
     
     mensaje += `\n👇 Toca el número del libro que quieres ver`;
     
-    const teclado = {};
-    if (offset + 5 < busqueda.totalLibros) {
-        teclado.reply_markup = {
-            inline_keyboard: [
-                [{ text: '📖 Ver más títulos', callback_data: `mas_titulo_${encodeURIComponent(titulo)}_${nuevaPagina + 1}` }]
-            ]
-        };
-    }
+    // ==================== TECLADO_PAGINACION_TITULOS ====================
+const botonesNumericos = [];
+const inicioNumero = offset + 1;
+
+for (let i = 0; i < librosPagina.length; i++) {
+    botonesNumericos.push({
+        text: `${inicioNumero + i}`,
+        callback_data: `libro_${inicioNumero + i}`
+    });
+}
+
+const inline_keyboard = [];
+inline_keyboard.push(botonesNumericos);
+
+// Agregar botón "Ver más títulos" si hay más páginas
+if (offset + 5 < busqueda.totalLibros) {
+    inline_keyboard.push([{ 
+        text: '📖 Ver más títulos', 
+        callback_data: `mas_titulo_${encodeURIComponent(titulo)}_${nuevaPagina + 1}` 
+    }]);
+}
+
+const teclado = {
+    reply_markup: { inline_keyboard }
+};
     
     guardarBusqueda(usuarioId, claveBusqueda, busqueda.libros, nuevaPagina, busqueda.totalLibros);
     
