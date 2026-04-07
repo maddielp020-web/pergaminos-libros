@@ -1,5 +1,5 @@
 // ==================== IMPORTACIONES ====================
-const { Telegraf, Markup } = require('telegraf');
+const { Telegraf } = require('telegraf');
 const { BOT_TOKEN } = require('./config');
 const { buscarPorAutor, buscarPorTitulo, normalizarTexto } = require('./buscar/gutendex');
 const { formatearListaAutorConBotones, formatearLibroUnicoConBotones, obtenerMensajeEspecial } = require('./mensajes/formatear');
@@ -10,10 +10,6 @@ const {
     obtenerEstadisticas,
     borrarTodo
 } = require('./almacen/almacenManager');
-
-// ==================== VARIABLES GLOBALES ====================
-// Sesiones temporales para feedback
-global.feedbackSesiones = new Map();
 
 // ==================== EXTRAER PALABRAS CLAVE ====================
 function extraerPalabrasClave(frase) {
@@ -123,9 +119,6 @@ async function buscarAutorPrincipal(ctx, autor) {
 async function buscarTituloPrincipal(ctx, titulo) {
     console.log(`🔍 Buscando título: "${titulo}"`);
     const usuarioId = ctx.from.id;
-    let usoPalabrasClave = false;
-    let libros = [];
-    let totalEncontrados = 0;
     
     // Normalizar el título para búsqueda
     const tituloNormalizado = normalizarTexto(titulo);
@@ -138,10 +131,7 @@ async function buscarTituloPrincipal(ctx, titulo) {
         const primeros5 = librosCache.slice(0, 5);
         const total = librosCache.length;
         
-        let mensaje = '';
-        
-        // Si viene de caché, no sabemos si usó palabras clave, así que no mostramos aviso
-        mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
+        let mensaje = `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
         mensaje += `(${total} libros encontrados)\n\n`;
         
         primeros5.forEach((libro, idx) => {
@@ -154,19 +144,14 @@ async function buscarTituloPrincipal(ctx, titulo) {
         
         guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, librosCache, 0, total);
         const { teclado } = formatearListaAutorConBotones(tituloNormalizado, primeros5, 0, total);
-        
-        // Añadir botones de feedback
-        const feedbackKeyboard = Markup.inlineKeyboard([
-            [Markup.button.callback('👍 Sí', `feedback_ok_${Date.now()}`),
-             Markup.button.callback('👎 No', `feedback_bad_${Date.now()}`)]
-        ]);
-        
         await ctx.reply(mensaje, { ...teclado });
-        await ctx.reply('¿Te fue útil esta búsqueda?', feedbackKeyboard);
         return;
     }
     
-    // Buscar en Open Library por título - PASO 1: Normalizado
+    // Paso 1: Buscar con título normalizado
+    let libros = [];
+    let usoPalabrasClave = false;
+    
     try {
         let resultados = await buscarPorTitulo(tituloNormalizado, 'es');
         libros = resultados;
@@ -176,7 +161,7 @@ async function buscarTituloPrincipal(ctx, titulo) {
             libros = resultados;
         }
         
-        // PASO 2: Si no hay resultados, extraer palabras clave
+        // Paso 2: Si no hay resultados, usar palabras clave
         if (libros.length === 0) {
             const palabrasClave = extraerPalabrasClave(tituloNormalizado);
             
@@ -195,20 +180,18 @@ async function buscarTituloPrincipal(ctx, titulo) {
         }
         
         if (libros.length > 0) {
-            // Guardar en caché
             guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, libros);
             const primeros5 = libros.slice(0, 5);
-            totalEncontrados = libros.length;
+            const total = libros.length;
             
             let mensaje = '';
             
-            // Aviso si se usaron palabras clave
             if (usoPalabrasClave) {
                 mensaje = `📌 No encontré el título exacto que buscabas. Te muestro resultados relacionados con las palabras clave de tu solicitud.\n\n`;
             }
             
             mensaje += `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
-            mensaje += `(${totalEncontrados} libros encontrados)\n\n`;
+            mensaje += `(${total} libros encontrados)\n\n`;
             
             primeros5.forEach((libro, idx) => {
                 const numero = idx + 1;
@@ -218,17 +201,9 @@ async function buscarTituloPrincipal(ctx, titulo) {
             
             mensaje += `\n👇 Toca el número del libro que quieres ver`;
             
-            guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, libros, 0, totalEncontrados);
-            const { teclado } = formatearListaAutorConBotones(tituloNormalizado, primeros5, 0, totalEncontrados);
-            
-            // Añadir botones de feedback
-            const feedbackKeyboard = Markup.inlineKeyboard([
-                [Markup.button.callback('👍 Sí', `feedback_ok_${Date.now()}_${tituloNormalizado.substring(0, 20)}`),
-                 Markup.button.callback('👎 No', `feedback_bad_${Date.now()}_${tituloNormalizado.substring(0, 20)}`)]
-            ]);
-            
+            guardarBusqueda(usuarioId, `titulo_${tituloNormalizado}`, libros, 0, total);
+            const { teclado } = formatearListaAutorConBotones(tituloNormalizado, primeros5, 0, total);
             await ctx.reply(mensaje, { ...teclado });
-            await ctx.reply('¿Te fue útil esta búsqueda?', feedbackKeyboard);
             return;
         }
     } catch (error) {
@@ -248,14 +223,7 @@ async function buscarTituloPrincipal(ctx, titulo) {
     mensaje += `- Revisa la ortografía (tildes, mayúsculas)\n\n`;
     mensaje += `📌 Ejemplo: /titulo Trafalgar`;
     
-    // Añadir feedback también cuando no hay resultados
-    const feedbackKeyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('👍 Sí', `feedback_ok_${Date.now()}_${tituloNormalizado.substring(0, 20)}`),
-         Markup.button.callback('👎 No', `feedback_bad_${Date.now()}_${tituloNormalizado.substring(0, 20)}`)]
-    ]);
-    
     await ctx.reply(mensaje);
-    await ctx.reply('¿Te fue útil esta búsqueda?', feedbackKeyboard);
 }
 
 // ==================== HANDLER_START ====================
@@ -379,7 +347,7 @@ bot.command('autor', async (ctx) => {
     mensaje += `No encontré libros de ese autor.\n\n`;
     mensaje += `📘 Sugerencias:\n`;
     mensaje += `- Revisa la ortografía del nombre\n`;
-    mensaje += `- Prueba con /busqueda_amplia para buscar en todo el texto\n`;
+    mensaje += `- Prueba con /titulo si conoces el título exacto\n`
     mensaje += `- Escribe /ayuda para ver ejemplos\n\n`;
     mensaje += `Ejemplo: /autor Jose Marti`;
     
@@ -504,104 +472,6 @@ bot.command('borrar_todo', async (ctx) => {
     borrarTodo();
     busquedasUsuario.clear();
     await ctx.reply('✅ Almacén vaciado');
-});
-
-// ==================== FEEDBACK CALLBACKS ====================
-// Feedback positivo (👍)
-bot.action(/^feedback_ok_(.+)$/, async (ctx) => {
-    const data = ctx.match[1];
-    await ctx.answerCbQuery();
-    await ctx.reply('🙌 ¡Me alegra! Disfruta tu lectura.');
-    
-    // Opcional: enviar feedback positivo al creador (comentado por ahora para no saturar)
-    /*
-    const usuario = ctx.from;
-    await ctx.telegram.sendMessage(ID_CREADOR, 
-        `📊 FEEDBACK POSITIVO\n\n` +
-        `Usuario: @${usuario.username || usuario.first_name}\n` +
-        `ID: ${usuario.id}\n` +
-        `Datos: ${data}\n` +
-        `Fecha: ${new Date().toLocaleString()}`
-    );
-    */
-});
-
-// Feedback negativo (👎)
-bot.action(/^feedback_bad_(.+)$/, async (ctx) => {
-    const data = ctx.match[1];
-    await ctx.answerCbQuery();
-    
-    // Guardar el término de búsqueda en sesión temporal para el feedback
-    const usuarioId = ctx.from.id;
-    const feedbackData = {
-        termino: data,
-        timestamp: Date.now()
-    };
-    
-    // Almacenar en memoria (expira en 5 minutos)
-    if (!feedbackSesiones) global.feedbackSesiones = new Map();
-    feedbackSesiones.set(usuarioId, feedbackData);
-    
-    await ctx.reply(
-        '📝 Gracias por tu honestidad. ¿Qué salió mal?\n\n' +
-        'Responde con un número:\n' +
-        '1️⃣ No encontré el libro que buscaba\n' +
-        '2️⃣ Los resultados no son relevantes\n' +
-        '3️⃣ El bot no entendió mi búsqueda\n' +
-        '4️⃣ Otro problema (escríbelo brevemente)\n\n' +
-        'Tu feedback me ayuda a mejorar. 🙏'
-    );
-});
-
-// Manejar respuestas de texto después de feedback negativo
-bot.on('text', async (ctx) => {
-    const usuarioId = ctx.from.id;
-    if (!global.feedbackSesiones) return;
-    
-    const feedbackData = global.feedbackSesiones.get(usuarioId);
-    if (!feedbackData) return;
-    
-    // Verificar que no haya pasado más de 5 minutos
-    if (Date.now() - feedbackData.timestamp > 5 * 60 * 1000) {
-        global.feedbackSesiones.delete(usuarioId);
-        return;
-    }
-    
-    const respuesta = ctx.message.text;
-    let motivo = '';
-    
-    // Mapear la respuesta del usuario
-    if (respuesta === '1' || respuesta === '1️⃣') {
-        motivo = '1️⃣ No encontré el libro que buscaba';
-    } else if (respuesta === '2' || respuesta === '2️⃣') {
-        motivo = '2️⃣ Los resultados no son relevantes';
-    } else if (respuesta === '3' || respuesta === '3️⃣') {
-        motivo = '3️⃣ El bot no entendió mi búsqueda';
-    } else if (respuesta === '4' || respuesta === '4️⃣') {
-        motivo = '4️⃣ Otro problema (pendiente de detalles)';
-    } else {
-        motivo = `4️⃣ Otro problema: "${respuesta.substring(0, 200)}"`;
-    }
-    
-    // Enviar feedback al creador
-    const usuario = ctx.from;
-    const mensajeFeedback = 
-        `📊 FEEDBACK RECIBIDO\n\n` +
-        `Usuario: @${usuario.username || usuario.first_name}\n` +
-        `ID: ${usuario.id}\n` +
-        `Comando: /titulo\n` +
-        `Término buscado: "${feedbackData.termino}"\n` +
-        `Feedback: 👎 Negativo\n` +
-        `Motivo: ${motivo}\n` +
-        `Fecha: ${new Date().toLocaleString()}`;
-    
-    await ctx.telegram.sendMessage(ID_CREADOR, mensajeFeedback);
-    
-    // Responder al usuario
-    await ctx.reply('🙏 Gracias por tu feedback. Lo tendré en cuenta para mejorar.');
-    
-    // Limpiar la sesión
-    global.feedbackSesiones.delete(usuarioId);
 });
 
 // ==================== EXPORTS ====================
