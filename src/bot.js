@@ -1,16 +1,15 @@
 // ==================== IMPORTACIONES ====================
 const { Telegraf } = require('telegraf');
 const { BOT_TOKEN } = require('./config');
-const { buscarPorAutor, buscarPorTitulo, normalizarTexto } = require('./buscar/gutendex');
+const { buscarPorAutor: buscarPorAutorGutendex, buscarPorTitulo: buscarPorTituloGutendex, normalizarTexto } = require('./buscar/gutendex');
 const { formatearListaAutorConBotones, formatearLibroUnicoConBotones, obtenerMensajeEspecial } = require('./mensajes/formatear');
-const { buscarPorAutorConPaginacion } = require('./buscar/openLibrary');
+const { buscarPorAutorConPaginacion, buscarPorTitulo } = require('./buscar/openLibrary');
 const {
     obtenerLibrosPorAutor,
     guardarLibrosPorAutor,
     obtenerEstadisticas,
     borrarTodo
 } = require('./almacen/almacenManager');
-
 // ==================== EXTRAER PALABRAS CLAVE ====================
 function extraerPalabrasClave(frase, modo = 'simple') {
     // Palabras muy cortas o comunes que se ignoran
@@ -443,7 +442,6 @@ bot.action(/^mas_(.+)_(\d+)$/, async (ctx) => {
             
             // Construir URL con offset (Open Library no soporta offset directo en title search)
             // Alternativa: buscar más resultados y paginar localmente
-            const { buscarPorTitulo: buscarTituloAPI } = require('./buscar/openLibrary');
             
             // Traer un lote más grande (offset + 5) y quedarnos con los últimos 5
             // Esto es temporal; idealmente modificaríamos openLibrary.js para soportar offset
