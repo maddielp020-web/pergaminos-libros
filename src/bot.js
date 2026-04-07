@@ -112,9 +112,9 @@ async function buscarAutorPrincipal(ctx, autor) {
     }
     
     try {
-        let libros = await buscarPorAutor(autor, 'es');
+        let libros = await buscarPorAutorGutendex(autor, 'es');
         if (libros.length === 0) {
-            libros = await buscarPorAutor(autor, 'en');
+            libros = await buscarPorAutorGutendex(autor, 'en');
         }
         
         if (libros.length > 0) {
