@@ -393,14 +393,23 @@ bot.command('titulo', async (ctx) => {
 
 // ==================== BOTÓN SIGUIENTES 5 ====================
 bot.action(/^mas_(.+)_(\d+)$/, async (ctx) => {
-    const autor = ctx.match[1];
+    const termino = ctx.match[1];
     const paginaActual = parseInt(ctx.match[2]);
     const usuarioId = ctx.from.id;
     const busqueda = obtenerBusqueda(usuarioId);
     
-    if (!busqueda || busqueda.autor !== autor) {
+    // Detectar si es búsqueda por título o por autor
+    const esTitulo = termino.startsWith('titulo_');
+    const claveBusqueda = esTitulo ? termino : termino;
+    
+    if (!busqueda || busqueda.autor !== claveBusqueda) {
         await ctx.answerCbQuery('Búsqueda no encontrada');
-        await ctx.reply(`❓ Primero buscá al autor con: /autor ${autor}`);
+        if (esTitulo) {
+            const tituloOriginal = termino.replace('titulo_', '');
+            await ctx.reply(`❓ Primero buscá el título con: /titulo ${tituloOriginal}`);
+        } else {
+            await ctx.reply(`❓ Primero buscá al autor con: /autor ${termino}`);
+        }
         return;
     }
     
@@ -409,17 +418,60 @@ bot.action(/^mas_(.+)_(\d+)$/, async (ctx) => {
     
     if (offset >= busqueda.totalLibros) {
         await ctx.answerCbQuery('No hay más libros');
-        await ctx.reply(`📚 *No hay más libros para* "${autor}"`);
+        if (esTitulo) {
+            const tituloOriginal = termino.replace('titulo_', '');
+            await ctx.reply(`📚 *No hay más libros para el título* "${tituloOriginal}"`);
+        } else {
+            await ctx.reply(`📚 *No hay más libros para* "${termino}"`);
+        }
         return;
     }
     
     try {
-        const siguientePagina = await buscarPorAutorConPaginacion(autor, 'es', offset);
-        let nuevosLibros = siguientePagina.libros;
+        let nuevosLibros = [];
+        let totalActualizado = busqueda.totalLibros;
         
-        if (nuevosLibros.length === 0) {
-            const siguientePaginaEn = await buscarPorAutorConPaginacion(autor, 'en', offset);
-            nuevosLibros = siguientePaginaEn.libros;
+        if (esTitulo) {
+            // Paginación para TÍTULOS
+            const tituloOriginal = termino.replace('titulo_', '');
+            console.log(`🔄 Paginación de título: "${tituloOriginal}", offset: ${offset}`);
+            
+            // Usar la misma función buscarPorTitulo, pero necesitamos traer más resultados
+            // Como buscarPorTitulo solo trae 5, necesitamos traer la página específica
+            // Opción: traer todos los resultados de una vez y paginar localmente, o hacer múltiples llamadas
+            // Por simplicidad y eficiencia, traemos 5 resultados por página usando un offset personalizado
+            
+            // Construir URL con offset (Open Library no soporta offset directo en title search)
+            // Alternativa: buscar más resultados y paginar localmente
+            const { buscarPorTitulo: buscarTituloAPI } = require('./buscar/openLibrary');
+            
+            // Traer un lote más grande (offset + 5) y quedarnos con los últimos 5
+            // Esto es temporal; idealmente modificaríamos openLibrary.js para soportar offset
+            const resultadosCompletos = busqueda.libros;
+            const inicio = offset;
+            const fin = offset + 5;
+            
+            if (inicio < resultadosCompletos.length) {
+                nuevosLibros = resultadosCompletos.slice(inicio, fin);
+            } else {
+                // Si no hay suficientes en caché, intentar buscar más (esto es raro)
+                console.log(`⚠️ No hay suficientes libros en caché para título: ${tituloOriginal}`);
+                nuevosLibros = [];
+            }
+            
+            totalActualizado = busqueda.totalLibros;
+            
+        } else {
+            // Paginación para AUTORES (código original)
+            const siguientePagina = await buscarPorAutorConPaginacion(termino, 'es', offset);
+            nuevosLibros = siguientePagina.libros;
+            
+            if (nuevosLibros.length === 0) {
+                const siguientePaginaEn = await buscarPorAutorConPaginacion(termino, 'en', offset);
+                nuevosLibros = siguientePaginaEn.libros;
+            }
+            
+            totalActualizado = siguientePagina.totalEncontrados || busqueda.totalLibros;
         }
         
         if (nuevosLibros.length === 0) {
@@ -428,12 +480,46 @@ bot.action(/^mas_(.+)_(\d+)$/, async (ctx) => {
         }
         
         // Actualizar la lista completa de libros
-        const librosActualizados = [...busqueda.libros, ...nuevosLibros];
-        guardarLibrosPorAutor(autor, librosActualizados);
+        let librosActualizados;
+        if (esTitulo) {
+            // Para títulos, los libros ya están en caché (los trajimos todos al principio)
+            librosActualizados = busqueda.libros;
+        } else {
+            librosActualizados = [...busqueda.libros, ...nuevosLibros];
+            guardarLibrosPorAutor(termino, librosActualizados);
+        }
         
-        // Usar librosActualizados (no nuevosLibros) para formatear
-        const { mensaje, teclado } = formatearListaAutorConBotones(autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
-        guardarBusqueda(usuarioId, autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
+        // Formatear mensaje con los nuevos libros (mostrar los de la página actual)
+        const inicioPagina = offset;
+        const librosPagina = librosActualizados.slice(inicioPagina, inicioPagina + 5);
+        
+        let mensaje = '';
+        if (esTitulo) {
+            const tituloOriginal = termino.replace('titulo_', '');
+            mensaje = `📚 BÚSQUEDA POR TÍTULO: "${tituloOriginal}"\n\n`;
+            mensaje += `(${totalActualizado} libros encontrados)\n\n`;
+            
+            librosPagina.forEach((libro, idx) => {
+                const numero = inicioPagina + idx + 1;
+                const año = libro.anio ? ` (${libro.anio})` : '';
+                mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
+            });
+            
+            mensaje += `\n👇 Toca el número del libro que quieres ver`;
+        } else {
+            const { mensaje: msgFormateado } = formatearListaAutorConBotones(termino, librosPagina, nuevaPagina, totalActualizado);
+            mensaje = msgFormateado;
+        }
+        
+        // Crear teclado con botones de paginación
+        const { teclado } = formatearListaAutorConBotones(
+            esTitulo ? termino : termino, 
+            librosPagina, 
+            nuevaPagina, 
+            totalActualizado
+        );
+        
+        guardarBusqueda(usuarioId, claveBusqueda, librosActualizados, nuevaPagina, totalActualizado);
         
         await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
         await ctx.reply(mensaje, { ...teclado });
