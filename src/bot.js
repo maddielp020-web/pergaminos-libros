@@ -196,98 +196,6 @@ async function buscarTituloPrincipal(ctx, titulo) {
     await ctx.reply(mensaje);
 }
 
-// ==================== BUSCAR_AMPLIA_PRINCIPAL ====================
-async function buscarAmpliaPrincipal(ctx, termino) {
-    console.log(`🔍 Búsqueda amplia: "${termino}"`);
-    const usuarioId = ctx.from.id;
-    
-    // Verificar caché local
-    let librosCache = obtenerLibrosPorAutor(`amplia_${termino}`);
-    
-    if (librosCache && librosCache.length > 0) {
-        const primeros5 = librosCache.slice(0, 5);
-        const total = librosCache.length;
-        
-        let mensaje = `🔍 BÚSQUEDA AMPLIA: "${termino}"\n\n`;
-        mensaje += `(${total} libros encontrados)\n\n`;
-        
-        primeros5.forEach((libro, idx) => {
-            const numero = idx + 1;
-            const año = libro.anio ? ` (${libro.anio})` : '';
-            mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
-            
-            // Mostrar subjects si existen
-            if (libro.subjects && libro.subjects.length > 0) {
-                mensaje += `   Temas: ${libro.subjects.slice(0, 3).join(', ')}\n`;
-            } else {
-                mensaje += `   Temas: no disponible\n`;
-            }
-        });
-        
-        mensaje += `\n👇 Toca el número del libro que quieres ver`;
-        
-        guardarBusqueda(usuarioId, `amplia_${termino}`, librosCache, 0, total);
-        const { teclado } = formatearListaAutorConBotones(termino, primeros5, 0, total);
-        await ctx.reply(mensaje, { ...teclado });
-        return;
-    }
-    
-    // Buscar en Open Library con búsqueda amplia
-    try {
-        const { buscarAmplia } = require('./buscar/openLibrary');
-        const resultado = await buscarAmplia(termino);
-        
-        if (resultado.libros.length === 0) {
-            // No se encontraron resultados
-            let mensaje = `🔍 BÚSQUEDA AMPLIA: "${termino}"\n\n`;
-            mensaje += `No encontré libros relacionados con esa búsqueda.\n\n`;
-            mensaje += `📘 Posibles razones:\n`;
-            mensaje += `- Los libros sobre ese tema pueden tener derechos de autor\n`;
-            mensaje += `- El término es muy específico\n`;
-            mensaje += `- La búsqueda amplia busca en título, autor y temas\n\n`;
-            mensaje += `🔍 Sugerencias:\n`;
-            mensaje += `- Prueba con términos más generales\n`;
-            mensaje += `- Usa /autor si conoces un autor específico\n`;
-            mensaje += `- Usa /titulo si conoces el título exacto\n\n`;
-            mensaje += `📌 Ejemplo: /busqueda_amplia amor`;
-            
-            await ctx.reply(mensaje);
-            return;
-        }
-        
-        // Guardar en caché
-        guardarLibrosPorAutor(`amplia_${termino}`, resultado.libros);
-        const primeros5 = resultado.libros.slice(0, 5);
-        const total = resultado.total;
-        
-        let mensaje = `🔍 BÚSQUEDA AMPLIA: "${termino}"\n\n`;
-        mensaje += `(${Math.min(total, resultado.libros.length)} libros encontrados)\n\n`;
-        
-        primeros5.forEach((libro, idx) => {
-            const numero = idx + 1;
-            const año = libro.anio ? ` (${libro.anio})` : '';
-            mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
-            
-            // Mostrar subjects si existen
-            if (libro.subjects && libro.subjects.length > 0) {
-                mensaje += `   Temas: ${libro.subjects.slice(0, 3).join(', ')}\n`;
-            } else {
-                mensaje += `   Temas: no disponible\n`;
-            }
-        });
-        
-        mensaje += `\n👇 Toca el número del libro que quieres ver`;
-        
-        guardarBusqueda(usuarioId, `amplia_${termino}`, resultado.libros, 0, total);
-        const { teclado } = formatearListaAutorConBotones(termino, primeros5, 0, total);
-        await ctx.reply(mensaje, { ...teclado });
-        
-    } catch (error) {
-        console.error(`❌ Error en búsqueda amplia: ${error.message}`);
-        await ctx.reply(`⚠️ Error en la búsqueda. Intentá de nuevo más tarde.`);
-    }
-}
-
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
     await ctx.reply(
@@ -431,23 +339,6 @@ bot.command('titulo', async (ctx) => {
     }
     
     await buscarTituloPrincipal(ctx, query);
-});
-
-// ==================== HANDLER_BUSQUEDA_AMPLIA ====================
-bot.command('busqueda_amplia', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1);
-    const query = args.join(' ');
-    
-    if (!query) {
-        await ctx.reply(
-            'Escribe /busqueda_amplia seguido de una palabra o frase.\n\n' +
-            'Ejemplo: /busqueda_amplia amor\n' +
-            'Ejemplo: /busqueda_amplia guerra y paz'
-        );
-        return;
-    }
-    
-    await buscarAmpliaPrincipal(ctx, query);
 });
 
 // ==================== BOTÓN SIGUIENTES 5 ====================
