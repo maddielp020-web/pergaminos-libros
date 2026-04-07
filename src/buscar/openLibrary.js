@@ -306,7 +306,7 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
     const codigoIdioma = idioma === 'es' ? 'spa' : 'eng';
     
     try {
-        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(tituloLimpio)}&public_scan_b=true&limit=5&language=${codigoIdioma}`;
+        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(tituloLimpio)}&public_scan_b=true&language=${codigoIdioma}`;
         console.log(`   📡 URL: ${url}`);
         
         const response = await axios.get(url, {
