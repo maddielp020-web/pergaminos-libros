@@ -12,19 +12,37 @@ const {
 } = require('./almacen/almacenManager');
 
 // ==================== EXTRAER PALABRAS CLAVE ====================
-function extraerPalabrasClave(frase) {
+function extraerPalabrasClave(frase, modo = 'simple') {
     // Palabras muy cortas o comunes que se ignoran
     const palabrasIgnorar = ['el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 
                               'de', 'del', 'y', 'a', 'ante', 'bajo', 'cabe', 'con', 
                               'contra', 'desde', 'durante', 'en', 'entre', 'hacia', 
                               'hasta', 'mediante', 'para', 'por', 'según', 'sin', 
-                              'so', 'sobre', 'tras', 'vs'];
+                              'so', 'sobre', 'tras', 'vs', 'e', 'ni', 'o', 'u'];
     
     const palabras = frase.toLowerCase()
         .split(' ')
-        .filter(palabra => palabra.length > 3 && !palabrasIgnorar.includes(palabra));
+        .filter(palabra => {
+            // Permitir números (ej: 1984)
+            if (/^\d+$/.test(palabra)) return true;
+            // Palabras de 3 o más letras que no sean palabras ignoradas
+            return palabra.length >= 3 && !palabrasIgnorar.includes(palabra);
+        });
     
-    return palabras.join(' ');
+    if (modo === 'simple') {
+        // Si no hay palabras después de filtrar, usar la primera palabra original (último recurso)
+        if (palabras.length === 0) {
+            const primeraPalabra = frase.toLowerCase().split(' ')[0];
+            return primeraPalabra || '';
+        }
+        
+        // Usar la palabra MÁS LARGA (más específica, menos común)
+        const palabraMasLarga = palabras.reduce((a, b) => a.length >= b.length ? a : b);
+        return palabraMasLarga;
+    }
+    
+    // Modo 'multiple': primeras 2-3 palabras (para búsqueda más amplia)
+    return palabras.slice(0, 3).join(' ');
 }
 
 // ==================== INICIALIZACION ====================
@@ -161,19 +179,19 @@ async function buscarTituloPrincipal(ctx, titulo) {
             libros = resultados;
         }
         
-        // Paso 2: Si no hay resultados, usar palabras clave
+        // Paso 2: Si no hay resultados, usar palabra clave (MODO SIMPLE - UNA SOLA PALABRA)
         if (libros.length === 0) {
-            const palabrasClave = extraerPalabrasClave(tituloNormalizado);
+            const palabraClave = extraerPalabrasClave(tituloNormalizado, 'simple');
             
-            if (palabrasClave && palabrasClave !== tituloNormalizado && palabrasClave.length > 0) {
-                console.log(`🔄 Reintentando con palabras clave: "${palabrasClave}"`);
+            if (palabraClave && palabraClave !== tituloNormalizado && palabraClave.length > 0) {
+                console.log(`🔄 Reintentando con palabra clave simple: "${palabraClave}"`);
                 usoPalabrasClave = true;
                 
-                let resultadosClave = await buscarPorTitulo(palabrasClave, 'es');
+                let resultadosClave = await buscarPorTitulo(palabraClave, 'es');
                 libros = resultadosClave;
                 
                 if (libros.length === 0) {
-                    resultadosClave = await buscarPorTitulo(palabrasClave, 'en');
+                    resultadosClave = await buscarPorTitulo(palabraClave, 'en');
                     libros = resultadosClave;
                 }
             }
@@ -187,7 +205,8 @@ async function buscarTituloPrincipal(ctx, titulo) {
             let mensaje = '';
             
             if (usoPalabrasClave) {
-                mensaje = `📌 No encontré el título exacto que buscabas. Te muestro resultados relacionados con las palabras clave de tu solicitud.\n\n`;
+                const palabraUsada = extraerPalabrasClave(tituloNormalizado, 'simple');
+                mensaje = `📌 No encontré el título exacto "${titulo}". Te muestro resultados relacionados con la palabra clave "${palabraUsada}".\n\n`;
             }
             
             mensaje += `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
