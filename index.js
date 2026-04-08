@@ -91,3 +91,31 @@ process.once('SIGTERM', () => {
 });
 
 console.log('🎯 Sistema preparado. El bot arrancará cuando el servidor esté listo...');
+
+// ==================== ARRANQUE_SERVIDOR ====================
+let serverIniciado = false;
+const server = app.listen(PORT, '0.0.0.0', () => {
+    if (serverIniciado) return;
+    serverIniciado = true;
+    
+    console.log(`🌐 Servidor HTTP escuchando en puerto: ${PORT}`);
+    console.log(`   📍 Health check: http://0.0.0.0:${PORT}/health`);
+    
+    // Iniciar el bot solo una vez, después de que el servidor esté listo
+    setTimeout(() => {
+        iniciarBotSeguro();
+    }, 2000);
+});
+
+// ==================== MANEJO_ERRORES ====================
+process.once('SIGINT', () => {
+    console.log('🛑 Cerrando bot...');
+    bot.stop('SIGINT');
+    server.close(() => process.exit(0));
+});
+
+process.once('SIGTERM', () => {
+    console.log('🛑 Cerrando bot...');
+    bot.stop('SIGTERM');
+    server.close(() => process.exit(0));
+});
