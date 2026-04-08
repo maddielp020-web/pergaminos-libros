@@ -1,6 +1,6 @@
 // ==================== IMPORTACIONES ====================
 const express = require('express');
-const { PORT, BOT_TOKEN } = require('./config');
+const { PORT, BOT_TOKEN } = require('./src/config');
 
 // Fix para conflictos de Telegram
 process.env.NTBA_FIX_319 = '1';
@@ -34,7 +34,7 @@ app.get('/health', (req, res) => {
 console.log('🤖 Iniciando bot de Telegram...');
 
 // Importar bot después del servidor
-const bot = require('./bot');
+const bot = require('./src/bot');
 
 // Variable global para evitar múltiples inicios
 let botIniciado = false;
