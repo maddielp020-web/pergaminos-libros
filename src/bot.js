@@ -214,7 +214,7 @@ bot.command('autor', async (ctx) => {
     console.log(`🔍 /autor: "${autorNormalizado}"`);
     
     // Verificar caché en disco
-    let librosCache = obtenerLibrosPorAutor(autorNormalizado);
+    let librosCache = await obtenerLibrosPorAutor(autorNormalizado);
     
     if (librosCache && librosCache.length > 0) {
         if (pendientes.get(usuarioId) !== token) return;
@@ -270,7 +270,7 @@ bot.command('autor', async (ctx) => {
 
         if (libros.length > 0) {
             if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
-            guardarLibrosPorAutor(autorNormalizado, libros);
+            await guardarLibrosPorAutor(autorNormalizado, libros);
             const totalReal = libros.length;
             const mensaje = formatearMensajeAutor(autorNormalizado, libros, 0, totalReal);
             const teclado = crearTeclado(libros.slice(0, 5), 0, totalReal, autorNormalizado, 0, 'autor');
@@ -290,7 +290,7 @@ bot.command('autor', async (ctx) => {
         
         if (libros.length > 0) {
             if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
-            guardarLibrosPorAutor(autorNormalizado, libros);
+            await guardarLibrosPorAutor(autorNormalizado, libros);
             const mensaje = formatearMensajeAutor(autorNormalizado, libros, 0, libros.length);
             const teclado = crearTeclado(libros.slice(0, 5), 0, libros.length, autorNormalizado, 0, 'autor');
             guardarSesion(usuarioId, 'autor', autorNormalizado, libros, libros.length);
@@ -328,7 +328,7 @@ bot.command('titulo', async (ctx) => {
     console.log(`🔍 /titulo: "${tituloOriginal}" → normalizado: "${tituloNormalizado}"`);
     
     // Verificar caché en disco
-    let librosCache = obtenerLibrosPorAutor(`titulo_${tituloNormalizado}`);
+    let librosCache = await obtenerLibrosPorAutor(`titulo_${tituloNormalizado}`);
     
     if (librosCache && librosCache.length > 0) {
         if (pendientes.get(usuarioId) !== token) return;
@@ -372,7 +372,7 @@ bot.command('titulo', async (ctx) => {
         
         if (libros.length > 0) {
             if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
-            guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, libros);
+            await guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, libros);
             const mensaje = formatearMensajeTitulo(tituloOriginal, libros, 0, libros.length, prefijo);
             const teclado = crearTeclado(libros.slice(0, 5), 0, libros.length, tituloOriginal, 0, 'titulo');
             guardarSesion(usuarioId, 'titulo', tituloNormalizado, libros, libros.length);
@@ -392,7 +392,7 @@ bot.command('titulo', async (ctx) => {
         
         if (librosGutendex.length > 0) {
             if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
-            guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, librosGutendex);
+            await guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, librosGutendex);
             const mensaje = formatearMensajeTitulo(tituloOriginal, librosGutendex, 0, librosGutendex.length, '📚 BÚSQUEDA POR TÍTULO (Gutendex):\n\n');
             const teclado = crearTeclado(librosGutendex.slice(0, 5), 0, librosGutendex.length, tituloOriginal, 0, 'titulo');
             guardarSesion(usuarioId, 'titulo', tituloNormalizado, librosGutendex, librosGutendex.length);
@@ -516,7 +516,7 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
 // ==================== HANDLERS_ADMIN ====================
 bot.command('ver_almacen', async (ctx) => {
     if (ctx.from.id !== ID_CREADOR) return;
-    const stats = obtenerEstadisticas();
+    const stats = await obtenerEstadisticas();
     await ctx.reply(`📊 *Almacén:* ${stats.autores} autores, ${stats.titulos} títulos`, { parse_mode: 'Markdown' });
 });
 
@@ -527,7 +527,7 @@ bot.command('borrar_todo', async (ctx) => {
         await ctx.reply('⚠️ Usá `/borrar_todo CONFIRMAR` para confirmar');
         return;
     }
-    borrarTodo();
+    await borrarTodo();
     sesionesActivas.clear();
     pendientes.clear();
     await ctx.reply('✅ Almacén y sesiones vaciados');
