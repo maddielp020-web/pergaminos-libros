@@ -238,24 +238,39 @@ bot.command('autor', async (ctx) => {
         }
     };
     
-    // Buscar en Open Library
+    // Buscar en Open Library — acumular hasta 300 libros para paginación completa
     try {
+        const MAX_LIBROS = 300;
+        let idioma = 'es';
         let primeraPagina = await buscarPorAutorConPaginacion(autorNormalizado, 'es', 0);
-        let totalEncontrados = primeraPagina.totalEncontrados;
         let libros = primeraPagina.libros;
-        
+        let totalEncontrados = primeraPagina.totalEncontrados;
+
         if (libros.length === 0) {
             const paginaEn = await buscarPorAutorConPaginacion(autorNormalizado, 'en', 0);
             libros = paginaEn.libros;
             totalEncontrados = paginaEn.totalEncontrados;
+            idioma = 'en';
         }
-        
+
+        // Si hay más páginas en la API, seguir pidiendo hasta MAX_LIBROS
+        if (libros.length > 0 && totalEncontrados > libros.length) {
+            let paginaApi = 1;
+            while (libros.length < MAX_LIBROS && libros.length < totalEncontrados && paginaApi < 20) {
+                if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
+                try {
+                    const siguiente = await buscarPorAutorConPaginacion(autorNormalizado, idioma, paginaApi);
+                    if (!siguiente.libros || siguiente.libros.length === 0) break;
+                    libros = libros.concat(siguiente.libros);
+                    paginaApi++;
+                } catch (_) { break; }
+            }
+            libros = libros.slice(0, MAX_LIBROS);
+        }
+
         if (libros.length > 0) {
             if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
             guardarLibrosPorAutor(autorNormalizado, libros);
-            // FIX: usar libros.length como totalLibros — totalEncontrados viene de la API
-            // pero en sesión solo tenemos los libros descargados realmente, no todos los de la API.
-            // Si se paginara con totalEncontrados y libros.length < totalEncontrados, el slice devolvería vacío.
             const totalReal = libros.length;
             const mensaje = formatearMensajeAutor(autorNormalizado, libros, 0, totalReal);
             const teclado = crearTeclado(libros.slice(0, 5), 0, totalReal, autorNormalizado, 0, 'autor');
