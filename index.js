@@ -1,6 +1,6 @@
 // ==================== IMPORTACIONES ====================
 const express = require('express');
-const { PORT, BOT_TOKEN } = require('./src/config');
+const { PORT, BOT_TOKEN } = require('./config');
 
 // Fix para conflictos de Telegram
 process.env.NTBA_FIX_319 = '1';
@@ -34,7 +34,7 @@ app.get('/health', (req, res) => {
 console.log('🤖 Iniciando bot de Telegram...');
 
 // Importar bot después del servidor
-const bot = require('./src/bot');
+const bot = require('./bot');
 
 // Variable global para evitar múltiples inicios
 let botIniciado = false;
@@ -76,21 +76,6 @@ const iniciarBotSeguro = async () => {
         console.log('⚠️ El bot no se inició, pero el servidor HTTP sigue funcionando');
     }
 };
-
-// Arrancar el servidor HTTP
-let serverIniciado = false;
-const server = app.listen(PORT, '0.0.0.0', () => {
-    if (serverIniciado) return;
-    serverIniciado = true;
-    
-    console.log(`🌐 Servidor HTTP escuchando en puerto: ${PORT}`);
-    console.log(`   📍 Health check: http://0.0.0.0:${PORT}/health`);
-    
-    // Iniciar el bot solo una vez, después de que el servidor esté listo
-    setTimeout(() => {
-        iniciarBotSeguro();
-    }, 2000);
-});
 
 // ==================== MANEJO_ERRORES ====================
 process.once('SIGINT', () => {
