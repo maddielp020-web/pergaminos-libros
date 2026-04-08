@@ -6,7 +6,7 @@ const TIMEOUT_MS = 15000;
 const LIMITE_RESULTADOS = 5;           // 5 libros por página para experiencia móvil
 const MIN_CARACTERES_CONSULTA = 3;     // Evita consultas costosas
 
-console.log('📚 Módulo openLibrary.js cargado (PAGINACIÓN 5 en 5)');
+console.log('📚 Módulo openLibrary.js cargado (VERSIÓN LIMPIA - PAGINACIÓN 5 en 5)');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
 console.log(`   📊 Límite por página: ${LIMITE_RESULTADOS} resultados`);
 
@@ -212,15 +212,8 @@ async function buscarPorAutorConPaginacion(autor, idioma = 'es', offset = 0) {
         const docs = response.data.docs;
         console.log(`   📚 Open Library devolvió ${docs.length} libros (total: ${totalEncontrados})`);
         
-        const librosFormateados = docs.map(item => ({
-            id: item.key,
-            titulo: item.title,
-            autor: item.author_name ? item.author_name[0] : autor,
-            anio: item.first_publish_year || null,
-            enlaceHTML: item.key ? `https://openlibrary.org${item.key}` : null,
-            enlaceEPUB: null,
-            portada: item.cover_i ? `https://covers.openlibrary.org/b/id/${item.cover_i}-S.jpg` : null
-        }));
+        // UNIFICADO: Usar transformarResultado para mantener consistencia
+        const librosFormateados = docs.map(item => transformarResultado(item, autor, 'autor'));
         
         console.log(`   ✅ [Open Library] Encontrados ${librosFormateados.length} libros (offset ${offset})`);
         return { libros: librosFormateados, totalEncontrados };
