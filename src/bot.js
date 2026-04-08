@@ -479,9 +479,9 @@ bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
     const paginaActual = parseInt(ctx.match[2]);
     const usuarioId = ctx.from.id;
     
-    // Decodificar el título (convertir %20 a espacios)
     titulo = decodeURIComponent(titulo);
-    const claveBusqueda = `titulo_${titulo}`;
+    const tituloNormalizado = normalizarTexto(titulo);
+    const claveBusqueda = `titulo_${tituloNormalizado}`;
     const busqueda = obtenerBusqueda(usuarioId);
     
     if (!busqueda || busqueda.autor !== claveBusqueda) {
@@ -516,15 +516,47 @@ bot.action(/^mas_titulo_(.+)_(\d+)$/, async (ctx) => {
     });
     
     mensaje += `\n👇 Toca el número del libro que quieres ver`;
+    
+    const botonesNumericos = [];
+    const inicioNumero = offset + 1;
+    
+    for (let i = 0; i < librosPagina.length; i++) {
+        botonesNumericos.push({
+            text: `${inicioNumero + i}`,
+            callback_data: `libro_${inicioNumero + i}`
+        });
+    }
+    
+    const inline_keyboard = [];
+    inline_keyboard.push(botonesNumericos);
+    
+    if (offset + 5 < busqueda.totalLibros) {
+        inline_keyboard.push([{ 
+            text: '📖 Ver más títulos', 
+            callback_data: `mas_titulo_${encodeURIComponent(titulo)}_${nuevaPagina + 1}` 
+        }]);
+    }
+    
+    const teclado = {
+        reply_markup: { inline_keyboard }
+    };
+    
+    guardarBusqueda(usuarioId, claveBusqueda, busqueda.libros, nuevaPagina, busqueda.totalLibros);
+    
+    await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
+    await ctx.editMessageText(mensaje, { ...teclado });
+});
 
 // ==================== BOTÓN VER MÁS LIBROS (AUTOR) ====================
 bot.action(/^mas_autor_(.+)_(\d+)$/, async (ctx) => {
-    const autor = ctx.match[1];
+    const autor = decodeURIComponent(ctx.match[1]);
     const paginaActual = parseInt(ctx.match[2]);
     const usuarioId = ctx.from.id;
     const busqueda = obtenerBusqueda(usuarioId);
     
-    if (!busqueda || busqueda.autor !== autor) {
+    const claveBusqueda = autor;
+    
+    if (!busqueda || busqueda.autor !== claveBusqueda) {
         await ctx.answerCbQuery('Búsqueda no encontrada');
         await ctx.reply(`❓ Primero buscá al autor con: /autor ${autor}`);
         return;
@@ -539,65 +571,52 @@ bot.action(/^mas_autor_(.+)_(\d+)$/, async (ctx) => {
         return;
     }
     
-    try {
-        const siguientePagina = await buscarPorAutorConPaginacion(autor, 'es', offset);
-        let nuevosLibros = siguientePagina.libros;
-        
-        if (nuevosLibros.length === 0) {
-            const siguientePaginaEn = await buscarPorAutorConPaginacion(autor, 'en', offset);
-            nuevosLibros = siguientePaginaEn.libros;
-        }
-        
-        if (nuevosLibros.length === 0) {
-            await ctx.answerCbQuery('No hay más libros');
-            return;
-        }
-        
-        const librosActualizados = [...busqueda.libros, ...nuevosLibros];
-        guardarLibrosPorAutor(autor, librosActualizados);
-        
-        const { mensaje, teclado } = formatearListaAutorConBotones(autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
-        guardarBusqueda(usuarioId, autor, librosActualizados, nuevaPagina, busqueda.totalLibros);
-        
-        await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
-        await ctx.reply(mensaje, { ...teclado });
-        
-    } catch (error) {
-        console.error(`❌ Error en paginación de autor: ${error.message}`);
-        await ctx.answerCbQuery('Error al cargar');
-    }
-});
+    const librosPagina = busqueda.libros.slice(offset, offset + 5);
     
-    // ==================== TECLADO_PAGINACION_TITULOS ====================
-const botonesNumericos = [];
-const inicioNumero = offset + 1;
-
-for (let i = 0; i < librosPagina.length; i++) {
-    botonesNumericos.push({
-        text: `${inicioNumero + i}`,
-        callback_data: `libro_${inicioNumero + i}`
+    if (librosPagina.length === 0) {
+        await ctx.answerCbQuery('No hay más libros');
+        return;
+    }
+    
+    let mensaje = `📚 BÚSQUEDA POR AUTOR: "${autor}"\n\n`;
+    mensaje += `(${busqueda.totalLibros} libros encontrados)\n\n`;
+    
+    librosPagina.forEach((libro, idx) => {
+        const numero = offset + idx + 1;
+        const año = libro.anio ? ` (${libro.anio})` : '';
+        mensaje += `${numero}. ${libro.titulo}${año}\n`;
     });
-}
-
-const inline_keyboard = [];
-inline_keyboard.push(botonesNumericos);
-
-// Agregar botón "Ver más títulos" si hay más páginas
-if (offset + 5 < busqueda.totalLibros) {
-    inline_keyboard.push([{ 
-        text: '📖 Ver más títulos', 
-        callback_data: `mas_titulo_${encodeURIComponent(titulo)}_${nuevaPagina + 1}` 
-    }]);
-}
-
-const teclado = {
-    reply_markup: { inline_keyboard }
-};
+    
+    mensaje += `\n👇 Toca el número del libro que quieres ver`;
+    
+    const botonesNumericos = [];
+    const inicioNumero = offset + 1;
+    
+    for (let i = 0; i < librosPagina.length; i++) {
+        botonesNumericos.push({
+            text: `${inicioNumero + i}`,
+            callback_data: `libro_${inicioNumero + i}`
+        });
+    }
+    
+    const inline_keyboard = [];
+    inline_keyboard.push(botonesNumericos);
+    
+    if (offset + 5 < busqueda.totalLibros) {
+        inline_keyboard.push([{ 
+            text: '📖 Ver más libros', 
+            callback_data: `mas_autor_${encodeURIComponent(autor)}_${nuevaPagina + 1}` 
+        }]);
+    }
+    
+    const teclado = {
+        reply_markup: { inline_keyboard }
+    };
     
     guardarBusqueda(usuarioId, claveBusqueda, busqueda.libros, nuevaPagina, busqueda.totalLibros);
     
     await ctx.answerCbQuery(`Página ${nuevaPagina + 1}`);
-    await ctx.reply(mensaje, { ...teclado });
+    await ctx.editMessageText(mensaje, { ...teclado });
 });
 
 // ==================== CALLBACK LIBROS ====================
