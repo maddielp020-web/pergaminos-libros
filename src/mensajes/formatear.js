@@ -101,8 +101,5 @@ function obtenerMensajeEspecial(query) {
 
 // ==================== EXPORTS ====================
 module.exports = {
-    formatearListaAutorConBotones,
-    formatearLibroUnicoConBotones,
-    formatearErrorGutendex,
-    obtenerMensajeEspecial
+    formatearLibroUnicoConBotones
 };
