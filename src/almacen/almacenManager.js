@@ -1,33 +1,34 @@
 // ==================== IMPORTACIONES ====================
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 
 // ==================== CONFIGURACION ====================
 const RUTA_CACHE = path.join(__dirname, 'cache.json');
 
-console.log('💾 AlmacenManager cargado');
+console.log('💾 AlmacenManager cargado (VERSIÓN ASÍNCRONA)');
 console.log(`   📍 Ruta: ${RUTA_CACHE}`);
 
-// ==================== FUNCIONES_INTERNAS ====================
-function leerCache() {
+// ==================== FUNCIONES_INTERNAS_ASINCRONAS ====================
+async function leerCache() {
     try {
-        if (!fs.existsSync(RUTA_CACHE)) {
-            console.log('📁 Creando archivo cache.json...');
-            const estructuraInicial = { autores: {}, titulos: {} };
-            fs.writeFileSync(RUTA_CACHE, JSON.stringify(estructuraInicial, null, 2));
-            return estructuraInicial;
-        }
-        const data = fs.readFileSync(RUTA_CACHE, 'utf8');
+        await fs.access(RUTA_CACHE);
+        const data = await fs.readFile(RUTA_CACHE, 'utf8');
         return JSON.parse(data);
     } catch (error) {
+        if (error.code === 'ENOENT') {
+            console.log('📁 Creando archivo cache.json...');
+            const estructuraInicial = { autores: {}, titulos: {} };
+            await fs.writeFile(RUTA_CACHE, JSON.stringify(estructuraInicial, null, 2));
+            return estructuraInicial;
+        }
         console.error('❌ Error leyendo cache:', error.message);
         return { autores: {}, titulos: {} };
     }
 }
 
-function escribirCache(data) {
+async function escribirCache(data) {
     try {
-        fs.writeFileSync(RUTA_CACHE, JSON.stringify(data, null, 2));
+        await fs.writeFile(RUTA_CACHE, JSON.stringify(data, null, 2));
         console.log(`✅ Cache guardado (autores: ${Object.keys(data.autores).length}, titulos: ${Object.keys(data.titulos).length})`);
         return true;
     } catch (error) {
@@ -36,15 +37,15 @@ function escribirCache(data) {
     }
 }
 
-// ==================== FUNCIONES_PUBLICAS ====================
+// ==================== FUNCIONES_PUBLICAS_ASINCRONAS ====================
 
 /**
  * Obtiene libros de un autor desde el almacén
  * @param {string} autor - Nombre del autor
- * @returns {Array|null} Libros del autor o null si no existe
+ * @returns {Promise<Array|null>} Libros del autor o null si no existe
  */
-function obtenerLibrosPorAutor(autor) {
-    const cache = leerCache();
+async function obtenerLibrosPorAutor(autor) {
+    const cache = await leerCache();
     const clave = autor.toLowerCase().trim();
     if (cache.autores[clave]) {
         console.log(`💾 Cache HIT: autor "${autor}" (${cache.autores[clave].libros.length} libros)`);
@@ -57,10 +58,10 @@ function obtenerLibrosPorAutor(autor) {
 /**
  * Obtiene un libro por título desde el almacén
  * @param {string} titulo - Título del libro
- * @returns {Object|null} Libro o null si no existe
+ * @returns {Promise<Object|null>} Libro o null si no existe
  */
-function obtenerLibroPorTitulo(titulo) {
-    const cache = leerCache();
+async function obtenerLibroPorTitulo(titulo) {
+    const cache = await leerCache();
     const clave = titulo.toLowerCase().trim();
     if (cache.titulos[clave]) {
         console.log(`💾 Cache HIT: título "${titulo}"`);
@@ -75,44 +76,29 @@ function obtenerLibroPorTitulo(titulo) {
  * @param {string} autor - Nombre del autor
  * @param {Array} libros - Lista de libros
  */
-function guardarLibrosPorAutor(autor, libros) {
-    const cache = leerCache();
+async function guardarLibrosPorAutor(autor, libros) {
+    const cache = await leerCache();
     const clave = autor.toLowerCase().trim();
     cache.autores[clave] = {
         autor: autor,
         fecha: new Date().toISOString(),
         libros: libros
     };
-    escribirCache(cache);
+    await escribirCache(cache);
     console.log(`💾 Guardados ${libros.length} libros para autor "${autor}"`);
-}
-
-/**
- * Guarda un libro por título en el almacén
- * @param {Object} libro - Libro con titulo, autor, enlaces
- */
-function guardarLibroPorTitulo(libro) {
-    const cache = leerCache();
-    const clave = libro.titulo.toLowerCase().trim();
-    cache.titulos[clave] = {
-        ...libro,
-        fecha: new Date().toISOString()
-    };
-    escribirCache(cache);
-    console.log(`💾 Guardado título "${libro.titulo}"`);
 }
 
 /**
  * Elimina un autor del almacén
  * @param {string} autor - Nombre del autor
- * @returns {boolean} True si se eliminó
+ * @returns {Promise<boolean>} True si se eliminó
  */
-function eliminarAutor(autor) {
-    const cache = leerCache();
+async function eliminarAutor(autor) {
+    const cache = await leerCache();
     const clave = autor.toLowerCase().trim();
     if (cache.autores[clave]) {
         delete cache.autores[clave];
-        escribirCache(cache);
+        await escribirCache(cache);
         console.log(`🗑️ Eliminado autor: "${autor}"`);
         return true;
     }
@@ -123,14 +109,14 @@ function eliminarAutor(autor) {
 /**
  * Elimina un título del almacén
  * @param {string} titulo - Título del libro
- * @returns {boolean} True si se eliminó
+ * @returns {Promise<boolean>} True si se eliminó
  */
-function eliminarTitulo(titulo) {
-    const cache = leerCache();
+async function eliminarTitulo(titulo) {
+    const cache = await leerCache();
     const clave = titulo.toLowerCase().trim();
     if (cache.titulos[clave]) {
         delete cache.titulos[clave];
-        escribirCache(cache);
+        await escribirCache(cache);
         console.log(`🗑️ Eliminado título: "${titulo}"`);
         return true;
     }
@@ -140,10 +126,10 @@ function eliminarTitulo(titulo) {
 
 /**
  * Obtiene estadísticas del almacén
- * @returns {Object} { autores: number, titulos: number }
+ * @returns {Promise<Object>} { autores: number, titulos: number }
  */
-function obtenerEstadisticas() {
-    const cache = leerCache();
+async function obtenerEstadisticas() {
+    const cache = await leerCache();
     return {
         autores: Object.keys(cache.autores).length,
         titulos: Object.keys(cache.titulos).length
@@ -152,11 +138,11 @@ function obtenerEstadisticas() {
 
 /**
  * Borra TODO el almacén (con confirmación en función externa)
- * @returns {boolean} True si se borró
+ * @returns {Promise<boolean>} True si se borró
  */
-function borrarTodo() {
+async function borrarTodo() {
     const estructuraInicial = { autores: {}, titulos: {} };
-    const resultado = escribirCache(estructuraInicial);
+    const resultado = await escribirCache(estructuraInicial);
     if (resultado) {
         console.log('🗑️ TODO el almacén ha sido borrado');
     }
@@ -168,7 +154,6 @@ module.exports = {
     obtenerLibrosPorAutor,
     obtenerLibroPorTitulo,
     guardarLibrosPorAutor,
-    guardarLibroPorTitulo,
     eliminarAutor,
     eliminarTitulo,
     obtenerEstadisticas,
