@@ -253,9 +253,13 @@ bot.command('autor', async (ctx) => {
         if (libros.length > 0) {
             if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
             guardarLibrosPorAutor(autorNormalizado, libros);
-            const mensaje = formatearMensajeAutor(autorNormalizado, libros, 0, totalEncontrados);
-            const teclado = crearTeclado(libros.slice(0, 5), 0, totalEncontrados, autorNormalizado, 0, 'autor');
-            guardarSesion(usuarioId, 'autor', autorNormalizado, libros, totalEncontrados);
+            // FIX: usar libros.length como totalLibros — totalEncontrados viene de la API
+            // pero en sesión solo tenemos los libros descargados realmente, no todos los de la API.
+            // Si se paginara con totalEncontrados y libros.length < totalEncontrados, el slice devolvería vacío.
+            const totalReal = libros.length;
+            const mensaje = formatearMensajeAutor(autorNormalizado, libros, 0, totalReal);
+            const teclado = crearTeclado(libros.slice(0, 5), 0, totalReal, autorNormalizado, 0, 'autor');
+            guardarSesion(usuarioId, 'autor', autorNormalizado, libros, totalReal);
             await borrarCarga();
             await ctx.reply(mensaje, teclado);
             return;
