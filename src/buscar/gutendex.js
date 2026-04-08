@@ -6,7 +6,7 @@ const { GUTENDEX_API_URL } = require('../config');
 const TIMEOUT_MS = 15000;
 const MAX_RESULTADOS = 20;
 
-console.log('🔌 Módulo gutendex.js cargado (FASE CORREGIDA - Parámetro oficial "search=author:")');
+console.log('🔌 Módulo gutendex.js cargado (VERSIÓN LIMPIA - Sin duplicados ni código muerto)');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
 console.log(`   📡 API: ${GUTENDEX_API_URL}`);
 
@@ -180,15 +180,12 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
 
 // ==================== FUNCION_BUSCAR_POR_AUTOR ====================
 /**
- * Busca libros por autor con fallback de formatos e idioma
+ * Busca libros por autor con fallback de idioma
  * @param {string} autor - Nombre del autor
  * @param {string} idioma - Código de idioma inicial
  * @returns {Promise<Array>} Lista de libros
  */
 async function buscarPorAutor(autor, idioma = 'es') {
-    console.log(`👤 BUSCAR POR AUTOR: "${autor}" (idioma inicial: ${idioma})`);
-    
-    async function buscarPorAutor(autor, idioma = 'es') {
     console.log(`👤 BUSCAR POR AUTOR: "${autor}" (idioma inicial: ${idioma})`);
     
     // Probar en español
@@ -207,31 +204,6 @@ async function buscarPorAutor(autor, idioma = 'es') {
     }
     
     console.log(`   ❌ No se encontraron libros para "${autor}"`);
-    return [];
-}
-    
-    // Probar cada formato en español
-    for (const formato of formatosUnicos) {
-        console.log(`   🔍 Español: "${formato}"`);
-        const libros = await buscarLibrosEnGutendex(formato, 'es', 'autor');
-        if (libros.length > 0) {
-            console.log(`   ✅ ENCONTRADOS ${libros.length} libros con formato "${formato}" en español`);
-            return libros;
-        }
-    }
-    
-    // Si nada funciona en español, probar en inglés con los mismos formatos
-    console.log(`   🌎 Sin resultados en español, probando en inglés...`);
-    for (const formato of formatosUnicos) {
-        console.log(`   🔍 Inglés: "${formato}"`);
-        const libros = await buscarLibrosEnGutendex(formato, 'en', 'autor');
-        if (libros.length > 0) {
-            console.log(`   ✅ ENCONTRADOS ${libros.length} libros con formato "${formato}" en inglés`);
-            return libros;
-        }
-    }
-    
-    console.log(`   ❌ No se encontraron libros para "${autor}" en ningún formato`);
     return [];
 }
 
@@ -297,7 +269,6 @@ function normalizarTexto(texto) {
 module.exports = {
     buscarPorAutor,
     buscarPorTitulo,
-    normalizarConsulta,
     normalizarTitulo,
-    normalizarTexto  // ← NUEVA
+    normalizarTexto
 };
