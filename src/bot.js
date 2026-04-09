@@ -342,7 +342,7 @@ bot.command('titulo', async (ctx) => {
     // FIX: feedback visual mientras se busca
     let msgCarga;
     try {
-        msgCarga = await ctx.reply('🔍 Buscando título...');
+        msgCarga = await ctx.reply('🔍 Buscando título exacto...');
     } catch (_) {}
     
     const borrarCarga = async () => {
@@ -353,27 +353,16 @@ bot.command('titulo', async (ctx) => {
     };
     
     let libros = [];
-    let prefijo = '';
     
-    // Buscar en Open Library
+    // Buscar en Open Library (SOLO TÍTULO EXACTO)
     try {
         libros = await buscarPorTitulo(tituloNormalizado, 'es');
         if (libros.length === 0) libros = await buscarPorTitulo(tituloNormalizado, 'en');
         
-        if (libros.length === 0) {
-            const palabraClave = extraerPalabrasClave(tituloNormalizado, 'simple');
-            if (palabraClave && palabraClave !== tituloNormalizado) {
-                console.log(`🔄 Reintentando con palabra clave: "${palabraClave}"`);
-                libros = await buscarPorTitulo(palabraClave, 'es');
-                if (libros.length === 0) libros = await buscarPorTitulo(palabraClave, 'en');
-                prefijo = `📌 No encontré el título exacto. Mostrando resultados para "${palabraClave}".\n\n`;
-            }
-        }
-        
         if (libros.length > 0) {
             if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
             await guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, libros);
-            const mensaje = formatearMensajeTitulo(tituloOriginal, libros, 0, libros.length, prefijo);
+            const mensaje = formatearMensajeTitulo(tituloOriginal, libros, 0, libros.length);
             const teclado = crearTeclado(libros.slice(0, 5), 0, libros.length, tituloOriginal, 0, 'titulo');
             guardarSesion(usuarioId, 'titulo', tituloNormalizado, libros, libros.length);
             await borrarCarga();
@@ -384,32 +373,34 @@ bot.command('titulo', async (ctx) => {
         console.error(`❌ Error Open Library: ${error.message}`);
     }
     
-    // Fallback a Gutendex
-    try {
-        console.log(`🔄 Intentando Gutendex para: "${tituloNormalizado}"`);
-        let librosGutendex = await buscarPorTituloGutendex(tituloNormalizado, 'es');
-        if (librosGutendex.length === 0) librosGutendex = await buscarPorTituloGutendex(tituloNormalizado, 'en');
-        
-        if (librosGutendex.length > 0) {
-            if (pendientes.get(usuarioId) !== token) { await borrarCarga(); return; }
-            await guardarLibrosPorAutor(`titulo_${tituloNormalizado}`, librosGutendex);
-            const mensaje = formatearMensajeTitulo(tituloOriginal, librosGutendex, 0, librosGutendex.length, '📚 BÚSQUEDA POR TÍTULO (Gutendex):\n\n');
-            const teclado = crearTeclado(librosGutendex.slice(0, 5), 0, librosGutendex.length, tituloOriginal, 0, 'titulo');
-            guardarSesion(usuarioId, 'titulo', tituloNormalizado, librosGutendex, librosGutendex.length);
-            await borrarCarga();
-            await ctx.reply(mensaje, teclado);
-            return;
-        }
-    } catch (error) {
-        console.error(`❌ Error Gutendex: ${error.message}`);
-    }
-    
+    // Si no hay coincidencia exacta, NO buscar automáticamente.
+    // Mostrar mensaje de confirmación con palabra clave.
     await borrarCarga();
-    await ctx.reply(
-        `📚 No encontré libros para "${query}"\n\n` +
-        `📘 Posibles razones:\n- El libro no está en dominio público\n- El título tiene otra edición\n\n` +
-        `🔍 Sugerencias:\n- Usa /autor si conoces el autor\n- Prueba con palabras más cortas`
-    );
+    
+    const palabraClave = extraerPalabrasClave(tituloNormalizado, 'simple');
+    
+    // Guardar estado temporal para los callbacks
+    guardarSesion(usuarioId, 'pendiente_confirmacion', tituloNormalizado, {
+        tituloOriginal: tituloOriginal,
+        palabraClave: palabraClave,
+        token: token
+    }, 1);
+    
+    const mensajeConfirmacion = 
+        `📖 Lamentablemente, no encontré "${tituloOriginal}" tal cual lo solicitaste.\n\n` +
+        `Las bibliotecas que consulto no tienen ese título exacto. No es culpa mía, pero tampoco de ellas. Simplemente no está así.\n\n` +
+        `¿Te ayudo a buscar libros que tengan la palabra "${palabraClave}" en el título?`;
+    
+    const tecladoConfirmacion = {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '🔍 Sí, búscame relacionados', callback_data: `confirmar_titulo_palabra_clave` }],
+                [{ text: '❌ No, mejor lo dejo', callback_data: `cancelar_titulo_palabra_clave` }]
+            ]
+        }
+    };
+    
+    await ctx.reply(mensajeConfirmacion, tecladoConfirmacion);
 });
 
 // ==================== CALLBACK_MAS_AUTOR ====================
@@ -511,6 +502,116 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
     
     await ctx.answerCbQuery(`📖 ${libro.titulo.substring(0, 50)}`);
     await ctx.reply(mensaje, { parse_mode: 'Markdown', disable_web_page_preview: true });
+});
+
+// ==================== CALLBACK_CONFIRMAR_TITULO ====================
+bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
+    const usuarioId = ctx.from.id;
+    const sesion = obtenerSesion(usuarioId);
+    
+    if (!sesion || sesion.tipo !== 'pendiente_confirmacion') {
+        await ctx.answerCbQuery('Sesión expirada');
+        await ctx.reply('❓ Primero buscá un título con /titulo [nombre]');
+        return;
+    }
+    
+    const { tituloOriginal, palabraClave, token } = sesion.libros;
+    
+    await ctx.answerCbQuery();
+    
+    // Mensaje de transición
+    await ctx.reply(
+        `Perfecto. Ahora busco libros que contengan "${palabraClave}" en el título.\n\n` +
+        `No es exactamente lo que pediste, pero puede que encuentres algo parecido.\n\n` +
+        `Acá van los resultados:`
+    );
+    
+    // Limpiar sesión anterior
+    limpiarSesion(usuarioId);
+    
+    // FIX: feedback visual mientras se busca
+    let msgCarga;
+    try {
+        msgCarga = await ctx.reply('🔍 Buscando por palabra clave...');
+    } catch (_) {}
+    
+    const borrarCarga = async () => {
+        if (msgCarga) {
+            try { await ctx.telegram.deleteMessage(ctx.chat.id, msgCarga.message_id); } catch (_) {}
+            msgCarga = null;
+        }
+    };
+    
+    let libros = [];
+    let prefijo = `📌 Resultados para "${palabraClave}" (búsqueda por palabra clave):\n\n`;
+    
+    // Buscar en Open Library por palabra clave
+    try {
+        libros = await buscarPorTitulo(palabraClave, 'es');
+        if (libros.length === 0) libros = await buscarPorTitulo(palabraClave, 'en');
+        
+        if (libros.length > 0) {
+            const tituloClave = `titulo_${normalizarTexto(palabraClave)}`;
+            await guardarLibrosPorAutor(tituloClave, libros);
+            const mensaje = formatearMensajeTitulo(palabraClave, libros, 0, libros.length, prefijo);
+            const teclado = crearTeclado(libros.slice(0, 5), 0, libros.length, palabraClave, 0, 'titulo');
+            guardarSesion(usuarioId, 'titulo', normalizarTexto(palabraClave), libros, libros.length);
+            await borrarCarga();
+            await ctx.reply(mensaje, teclado);
+            return;
+        }
+    } catch (error) {
+        console.error(`❌ Error Open Library (palabra clave): ${error.message}`);
+    }
+    
+    // Fallback a Gutendex
+    try {
+        console.log(`🔄 Intentando Gutendex para palabra clave: "${palabraClave}"`);
+        let librosGutendex = await buscarPorTituloGutendex(palabraClave, 'es');
+        if (librosGutendex.length === 0) librosGutendex = await buscarPorTituloGutendex(palabraClave, 'en');
+        
+        if (librosGutendex.length > 0) {
+            const tituloClave = `titulo_${normalizarTexto(palabraClave)}`;
+            await guardarLibrosPorAutor(tituloClave, librosGutendex);
+            const mensaje = formatearMensajeTitulo(palabraClave, librosGutendex, 0, librosGutendex.length, '📚 BÚSQUEDA POR PALABRA CLAVE (Gutendex):\n\n');
+            const teclado = crearTeclado(librosGutendex.slice(0, 5), 0, librosGutendex.length, palabraClave, 0, 'titulo');
+            guardarSesion(usuarioId, 'titulo', normalizarTexto(palabraClave), librosGutendex, librosGutendex.length);
+            await borrarCarga();
+            await ctx.reply(mensaje, teclado);
+            return;
+        }
+    } catch (error) {
+        console.error(`❌ Error Gutendex (palabra clave): ${error.message}`);
+    }
+    
+    await borrarCarga();
+    await ctx.reply(
+        `📚 Tampoco encontré libros con la palabra "${palabraClave}".\n\n` +
+        `📘 Posibles razones:\n- El libro no está en dominio público\n- El título tiene otra edición\n\n` +
+        `🔍 Sugerencias:\n- Usa /autor si conoces el autor\n- Prueba con otra palabra clave`
+    );
+});
+
+// ==================== CALLBACK_CANCELAR_TITULO ====================
+bot.action('cancelar_titulo_palabra_clave', async (ctx) => {
+    const usuarioId = ctx.from.id;
+    const sesion = obtenerSesion(usuarioId);
+    
+    // Limpiar sesión de confirmación
+    limpiarSesion(usuarioId);
+    
+    await ctx.answerCbQuery();
+    
+    const mensajeCancelacion = 
+        `Entiendo. No pasa nada.\n\n` +
+        `Podemos intentar de otras maneras:\n\n` +
+        `📘 Con /autor si sabes quién lo escribió\n` +
+        `📘 Con /titulo pero con palabras más cortas\n` +
+        `📘 Revisando bien la ortografía del título\n\n` +
+        `Cuando quieras, escribí /ayuda y te guío.\n\n` +
+        `Aquí estoy para lo que necesites. 🙏`;
+    
+    await ctx.reply(mensajeCancelacion);
 });
 
 // ==================== HANDLERS_ADMIN ====================
