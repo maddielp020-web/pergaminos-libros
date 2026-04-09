@@ -147,21 +147,6 @@ function formatearMensajeTitulo(titulo, libros, offset, totalLibros, prefijo = '
     return mensaje;
 }
 
-function formatearMensajeTitulo(titulo, libros, offset, totalLibros, prefijo = '') {
-    const librosPagina = libros.slice(offset, offset + 5);
-    let mensaje = prefijo + `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
-    mensaje += `(${totalLibros} libros encontrados)\n\n`;
-    
-    librosPagina.forEach((libro, idx) => {
-        const numero = offset + idx + 1;
-        const año = libro.anio ? ` (${libro.anio})` : '';
-        mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
-    });
-    
-    mensaje += `\n👇 Toca el número del libro que quieres ver`;
-    return mensaje;
-}
-
 // FIX: helper para editar mensajes sin crashear si el mensaje fue borrado
 async function editarMensajeSeguro(ctx, mensaje, teclado) {
     try {
