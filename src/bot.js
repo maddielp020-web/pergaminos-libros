@@ -407,8 +407,8 @@ bot.command('titulo', async (ctx) => {
     const tecladoConfirmacion = {
         reply_markup: {
             inline_keyboard: [
-                [{ text: '🔍 Sí, búscame relacionados', callback_data: `confirmar_titulo_palabra_clave` }],
-                [{ text: '❌ No, mejor lo dejo', callback_data: `cancelar_titulo_palabra_clave` }]
+                [{ text: '🔍 Sí, busca entre los lomos cercanos', callback_data: `confirmar_titulo_palabra_clave` }],
+                [{ text: '🕯️ No, gracias. Volveré a mirar yo.', callback_data: `cancelar_titulo_palabra_clave` }]
             ]
         }
     };
@@ -616,13 +616,12 @@ bot.action('cancelar_titulo_palabra_clave', async (ctx) => {
     await ctx.answerCbQuery();
     
     const mensajeCancelacion = 
-        `Entiendo. No pasa nada.\n\n` +
-        `Podemos intentar de otras maneras:\n\n` +
-        `📘 Con /autor si sabes quién lo escribió\n` +
-        `📘 Con /titulo pero con palabras más cortas\n` +
-        `📘 Revisando bien la ortografía del título\n\n` +
-        `Cuando quieras, escribí /ayuda y te guío.\n\n` +
-        `Aquí estoy para lo que necesites. 🙏`;
+        `🕯️ Sin prisa. No siempre encontramos el libro a la primera.\n\n` +
+        `Si quieres, podemos intentarlo de nuevo:\n` +
+        `- Dime el autor con /autor Nombre\n` +
+        `- O acortemos la búsqueda con menos palabras en /titulo\n\n` +
+        `Si ya estás completamente perdido entre tanto estante, escribe /ayuda_extendida. Te enviaré una guía más detallada a tu privado (si tú me lo permites).\n\n` +
+        `Aquí sigo, custodiando lo eterno. 🙏`;
     
     await ctx.reply(mensajeCancelacion);
 });
