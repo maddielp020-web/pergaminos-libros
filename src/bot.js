@@ -203,7 +203,12 @@ bot.command('autor', async (ctx) => {
     const usuarioId = ctx.from.id;
     
     if (!query) {
-        await ctx.reply('📖 Dame un nombre y te ayudo.\n\nEscribe /autor seguido del autor.\n\nPor ejemplo: /autor Jose Marti');
+        await ctx.reply(
+            '🕯️ Silencio en la estantería... pero necesito saber a quién buscas.\n\n' +
+            'Prueba con: /autor Nombre Apellido\n' +
+            '(Como cuando le dices al bibliotecario el nombre completo del autor).\n\n' +
+            'Ejemplo: /autor Emily Dickinson — La poeta del guion largo.'
+        );
         return;
     }
     
@@ -316,7 +321,12 @@ bot.command('titulo', async (ctx) => {
     const usuarioId = ctx.from.id;
     
     if (!query) {
-        await ctx.reply('📖 Dame un título y lo busco.\n\nEscribe /titulo seguido del libro.\n\nPor ejemplo: /titulo El Principito');
+        await ctx.reply(
+            '🕯️ Silencio en la estantería... pero necesito saber qué libro buscas.\n\n' +
+            'Prueba con: /titulo Nombre del Libro\n' +
+            '(Como cuando le dices al bibliotecario el título exacto).\n\n' +
+            'Ejemplo: /titulo Moby Dick — La ballena blanca te espera.'
+        );
         return;
     }
     
