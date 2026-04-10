@@ -400,9 +400,9 @@ bot.command('titulo', async (ctx) => {
     }, 1);
     
     const mensajeConfirmacion = 
-        `📖 Lamentablemente, no encontré "${tituloOriginal}" tal cual lo solicitaste.\n\n` +
-        `Las bibliotecas que consulto no tienen ese título exacto. No es culpa mía, pero tampoco de ellas. Simplemente no está así.\n\n` +
-        `¿Te ayudo a buscar libros que tengan la palabra "${palabraClave}" en el título?`;
+        `🕯️ He revisado los estantes altos y bajos... y no encuentro un ejemplar exacto de "${tituloOriginal}".\n\n` +
+        `A veces los títulos viajan con erratas, o duermen con otro nombre en los registros antiguos.\n\n` +
+        `¿Quieres que busque entre los lomos cercanos? Podría encontrar algo con la palabra "${palabraClave}".`;
     
     const tecladoConfirmacion = {
         reply_markup: {
@@ -534,11 +534,11 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     
     // Mensaje de transición
     await ctx.reply(
-        `Perfecto. Ahora busco libros que contengan "${palabraClave}" en el título.\n\n` +
-        `No es exactamente lo que pediste, pero puede que encuentres algo parecido.\n\n` +
-        `Acá van los resultados:`
+        `🕯️ Me adentro en los pasillos de títulos parecidos...\n\n` +
+        `Buscaré todo lo que contenga "${palabraClave}". A veces los tesoros están mal etiquetados.\n\n` +
+        `Aquí va lo que encontré:`
     );
-    
+        
     // Limpiar sesión anterior
     limpiarSesion(usuarioId);
     
@@ -556,7 +556,10 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     };
     
     let libros = [];
-    let prefijo = `📌 Resultados para "${palabraClave}" (búsqueda por palabra clave):\n\n`;
+    let prefijo = `📚 Encontré {cantidad} libros con "${palabraClave}" en el título.\n\n` +
+        `(No son exactos, pero algo de su esencia comparten).\n\n` +
+        `📖 Si ves el mismo título repetido, fíjate en el autor y el año. Ahí vive la diferencia. La elección es tuya.\n\n` +
+        `👇 Toca el número del que quieras abrir:\n\n`;
     
     // Buscar en Open Library por palabra clave
     try {
