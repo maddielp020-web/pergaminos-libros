@@ -168,14 +168,15 @@ async function editarMensajeSeguro(ctx, mensaje, teclado) {
 bot.command('start', async (ctx) => {
     limpiarSesion(ctx.from.id);
     await ctx.reply(
-        '📖 ¡Bienvenido a PergaminosAbiertos!\n\n' +
-        'Aquí encuentras libros en dominio público al instante.\n\n' +
-        '📚 COMANDOS PRINCIPALES:\n\n' +
-        '/autor Jose Marti\n→ Busca libros por autor\n\n' +
-        '/titulo El Principito\n→ Busca libros por título\n\n' +
-        '👇 Toca los botones numéricos para ver cada libro\n\n' +
-        '📘 ¿Dudas? Escribe /ayuda\n\n' +
-        '🔒 Solo mostramos libros en dominio público.'
+        '📖 PergaminosAbiertos\n' +
+        'Un lugar sin ruido para leer lo que el tiempo no pudo borrar.\n\n' +
+        '📚 Busca entre el polvo y la tinta:\n' +
+        '/autor Antonio Machado — Para escuchar al poeta.\n' +
+        '/titulo Drácula — Para sentir el frío de Transilvania.\n\n' +
+        '👇 Si prefieres dejarte sorprender, los botones numéricos esconden una historia distinta cada vez.\n\n' +
+        '🕯️ Aquí solo guardamos lo que ya es de todos. Lo eterno. Lo libre.\n\n' +
+        '📘 ¿No sabes por dónde empezar? Toca /ayuda.\n\n' +
+        '📬 ¿Echas de menos algún olor a papel viejo? Escríbeme /feedback. Esto lo cuidamos entre todos.'
     );
 });
 
