@@ -556,7 +556,7 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     };
     
     let libros = [];
-    let prefijo = `📚 Encontré {cantidad} libros con "${palabraClave}" en el título.\n\n` +
+    let prefijo = `📚 Estos son los libros que contienen "${palabraClave}" en el título.\n\n` +
         `(No son exactos, pero algo de su esencia comparten).\n\n` +
         `📖 Si ves el mismo título repetido, fíjate en el autor y el año. Ahí vive la diferencia. La elección es tuya.\n\n` +
         `👇 Toca el número del que quieras abrir:\n\n`;
