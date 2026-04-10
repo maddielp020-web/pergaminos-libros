@@ -6,7 +6,7 @@ const { GUTENDEX_API_URL } = require('../config');
 const TIMEOUT_MS = 15000;
 const MAX_RESULTADOS = 20;
 
-console.log('🔌 Módulo gutendex.js cargado (VERSIÓN LIMPIA - Sin duplicados ni código muerto)');
+console.log('🔌 Módulo gutendex.js cargado (VERSIÓN LIMPIA - Sin enlaces EPUB)');
 console.log(`   ⏱️ Timeout: ${TIMEOUT_MS}ms`);
 console.log(`   📡 API: ${GUTENDEX_API_URL}`);
 
@@ -79,36 +79,27 @@ function normalizarTitulo(titulo) {
 // ==================== FUNCION_EXTRAER_ENLACES ====================
 function extraerEnlaces(formats) {
     let enlaceHTML = null;
-    let enlaceEPUB = null;
+    // enlaceEPUB eliminado porque nunca funcionó confiablemente en iPhone
+    // Se mantiene solo lectura online (HTML)
     
-    if (!formats) return { enlaceHTML, enlaceEPUB };
+    if (!formats) return { enlaceHTML, enlaceEPUB: null };
     
     for (const [key, value] of Object.entries(formats)) {
         if (key === 'text/html; charset=utf-8' || key === 'text/html') {
             enlaceHTML = value;
         }
-        if (key === 'application/epub+zip') {
-            enlaceEPUB = value;
-        }
+        // Ya no se asigna enlaceEPUB
     }
     
-    return { enlaceHTML, enlaceEPUB };
+    return { enlaceHTML, enlaceEPUB: null };
 }
 
 // ==================== FUNCION_BUSCAR_EN_GUTENDEX ====================
-/**
- * Busca libros en Gutendex usando parámetros oficiales
- * @param {string} query - Término de búsqueda
- * @param {string} idioma - Código de idioma (es, en)
- * @param {string} tipo - 'titulo' o 'autor'
- * @returns {Promise<Array>} Lista de libros
- */
 async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
     try {
         let url = `${GUTENDEX_API_URL}/?languages=${idioma}`;
         
         if (tipo === 'autor') {
-            // PARÁMETRO OFICIAL: search=author:Nombre
             url += `&search=${encodeURIComponent(query)}`;
             console.log(`   👤 URL autor (oficial): ${url}`);
         } else {
@@ -148,7 +139,8 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
                 if (anioMatch) anio = parseInt(anioMatch[0]);
             }
             
-            const { enlaceHTML, enlaceEPUB } = extraerEnlaces(formats);
+            const { enlaceHTML } = extraerEnlaces(formats);
+            const enlaceEPUB = null; // Forzamos null
             
             return {
                 id,
@@ -164,7 +156,6 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
         return librosProcesados;
         
     } catch (error) {
-        // NO lanzar excepción - devolver array vacío para que el fallback continúe
         if (error.code === 'ECONNABORTED') {
             console.error(`   ⏰ TIMEOUT: "${query}" después de ${TIMEOUT_MS}ms`);
         } else if (error.response) {
@@ -179,23 +170,15 @@ async function buscarLibrosEnGutendex(query, idioma = 'es', tipo = 'titulo') {
 }
 
 // ==================== FUNCION_BUSCAR_POR_AUTOR ====================
-/**
- * Busca libros por autor con fallback de idioma
- * @param {string} autor - Nombre del autor
- * @param {string} idioma - Código de idioma inicial
- * @returns {Promise<Array>} Lista de libros
- */
 async function buscarPorAutor(autor, idioma = 'es') {
     console.log(`👤 BUSCAR POR AUTOR: "${autor}" (idioma inicial: ${idioma})`);
     
-    // Probar en español
     let libros = await buscarLibrosEnGutendex(autor, 'es', 'autor');
     if (libros.length > 0) {
         console.log(`   ✅ ENCONTRADOS ${libros.length} libros en español`);
         return libros;
     }
     
-    // Probar en inglés si español falla
     console.log(`   🌎 Sin resultados en español, probando en inglés...`);
     libros = await buscarLibrosEnGutendex(autor, 'en', 'autor');
     if (libros.length > 0) {
@@ -208,23 +191,15 @@ async function buscarPorAutor(autor, idioma = 'es') {
 }
 
 // ==================== FUNCION_BUSCAR_POR_TITULO ====================
-/**
- * Busca libros por título con fallback de idioma
- * @param {string} titulo - Título del libro
- * @param {string} idioma - Código de idioma inicial
- * @returns {Promise<Array>} Lista de libros
- */
 async function buscarPorTitulo(titulo, idioma = 'es') {
     console.log(`📖 BUSCAR POR TÍTULO: "${titulo}" (idioma inicial: ${idioma})`);
     
-    // Probar en español
     let libros = await buscarLibrosEnGutendex(titulo, 'es', 'titulo');
     if (libros.length > 0) {
         console.log(`   ✅ ENCONTRADOS ${libros.length} libros en español`);
         return libros;
     }
     
-    // Probar en inglés si español falla
     console.log(`   🌎 Sin resultados en español, probando en inglés...`);
     libros = await buscarLibrosEnGutendex(titulo, 'en', 'titulo');
     if (libros.length > 0) {
@@ -237,17 +212,11 @@ async function buscarPorTitulo(titulo, idioma = 'es') {
 }
 
 // ==================== FUNCION_NORMALIZAR_TEXTO ====================
-/**
- * Normaliza un texto para búsqueda: minúsculas, sin tildes, sin artículos iniciales
- * @param {string} texto - Texto a normalizar
- * @returns {string} Texto normalizado
- */
 function normalizarTexto(texto) {
     if (!texto) return '';
     
     let normalizado = texto.toLowerCase().trim();
     
-    // Eliminar tildes
     const reemplazos = {
         'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
         'ü': 'u', 'ñ': 'n', 'Á': 'a', 'É': 'e', 'Í': 'i',
@@ -255,11 +224,9 @@ function normalizarTexto(texto) {
     };
     normalizado = normalizado.replace(/[áéíóúüñÁÉÍÓÚÜÑ]/g, match => reemplazos[match] || match);
     
-    // Eliminar artículos comunes al inicio
     const articulos = /^(el |la |los |las |un |una |unos |unas )/;
     normalizado = normalizado.replace(articulos, '');
     
-    // Eliminar espacios extra
     normalizado = normalizado.trim().replace(/\s+/g, ' ');
     
     return normalizado;
