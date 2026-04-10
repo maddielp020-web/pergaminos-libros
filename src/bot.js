@@ -7,7 +7,11 @@ const {
     normalizarTexto 
 } = require('./buscar/gutendex');
 const { 
-    formatearLibroUnicoConBotones 
+    formatearLibroUnicoConBotones,
+    formatearMensajeAutor,
+    formatearMensajeTitulo,
+    crearTeclado,
+    editarMensajeSeguro
 } = require('./mensajes/formatear');
 const { 
     buscarPorAutorConPaginacion, 
@@ -31,7 +35,7 @@ console.log(`👑 ID Creador: ${ID_CREADOR}`);
 
 // ==================== ESTADO_EN_MEMORIA ====================
 const sesionesActivas = new Map();
-const pendientes = new Map(); // FIX: evita race conditions
+const pendientes = new Map();
 
 function guardarSesion(usuarioId, tipo, queryNormalizado, libros, totalLibros) {
     sesionesActivas.set(usuarioId, {
@@ -56,10 +60,9 @@ function obtenerSesion(usuarioId) {
 
 function limpiarSesion(usuarioId) {
     sesionesActivas.delete(usuarioId);
-    pendientes.delete(usuarioId); // FIX: limpiar token pendiente también
+    pendientes.delete(usuarioId);
 }
 
-// FIX: limpieza periódica para evitar fuga de memoria
 setInterval(() => {
     const ahora = Date.now();
     for (const [id, s] of sesionesActivas) {
@@ -86,82 +89,6 @@ function extraerPalabrasClave(frase, modo = 'simple') {
         return palabras.reduce((a, b) => a.length >= b.length ? a : b);
     }
     return palabras.slice(0, 3).join(' ');
-}
-
-// FIX: función unificada para crear teclados (elimina duplicación exacta)
-function crearTeclado(librosMostrados, offset, totalLibros, key, paginaActual, tipo) {
-    const inline_keyboard = [];
-    const botonesNumericos = [];
-    
-    for (let i = 0; i < librosMostrados.length; i++) {
-        botonesNumericos.push({
-            text: `${offset + i + 1}`,
-            callback_data: `libro_${offset + i + 1}`
-        });
-    }
-    inline_keyboard.push(botonesNumericos);
-    
-    if (offset + librosMostrados.length < totalLibros) {
-        // FIX: callback_data usa solo el número de página (evita superar límite 64 bytes de Telegram)
-        // La query se recupera desde la sesión en memoria
-        const label = tipo === 'autor' ? '📖 Ver más libros' : '📖 Ver más títulos';
-        const cbPrefix = tipo === 'autor' ? 'mas_autor' : 'mas_titulo';
-        inline_keyboard.push([{
-            text: label,
-            callback_data: `${cbPrefix}_${paginaActual + 1}`
-        }]);
-    }
-    
-    return { reply_markup: { inline_keyboard } };
-}
-
-function formatearMensajeAutor(autor, libros, offset, totalLibros) {
-    const librosPagina = libros.slice(offset, offset + 5);
-    let mensaje = `📚 BÚSQUEDA POR AUTOR: "${autor}"\n\n`;
-    mensaje += `(${totalLibros} libros encontrados)\n\n`;
-    
-    librosPagina.forEach((libro, idx) => {
-        const numero = offset + idx + 1;
-        const año = libro.anio ? ` (${libro.anio})` : '';
-        mensaje += `${numero}. ${libro.titulo}${año}\n`;
-    });
-    
-    mensaje += `\n📖 Si ves el mismo título varias veces, mirá el autor y el año. Ahí está la diferencia. La elección es tuya. Es un placer ayudarte.\n`;
-    mensaje += `\n👇 Toca el número del libro que quieres ver`;
-    return mensaje;
-}
-
-function formatearMensajeTitulo(titulo, libros, offset, totalLibros, prefijo = '') {
-    const librosPagina = libros.slice(offset, offset + 5);
-    let mensaje = prefijo + `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
-    mensaje += `(${totalLibros} libros encontrados)\n\n`;
-    
-    librosPagina.forEach((libro, idx) => {
-        const numero = offset + idx + 1;
-        const año = libro.anio ? ` (${libro.anio})` : '';
-        mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
-    });
-    
-    mensaje += `\n📖 Si ves el mismo título varias veces, mirá el autor y el año. Ahí está la diferencia. La elección es tuya. Es un placer ayudarte.\n`;
-    mensaje += `\n👇 Toca el número del libro que quieres ver`;
-    return mensaje;
-}
-
-// FIX: helper para editar mensajes sin crashear si el mensaje fue borrado
-async function editarMensajeSeguro(ctx, mensaje, teclado) {
-    try {
-        await ctx.editMessageText(mensaje, teclado);
-    } catch (e) {
-        if (
-            e.message.includes('message is not modified') ||
-            e.message.includes('message to edit not found') ||
-            e.message.includes('MESSAGE_ID_INVALID')
-        ) {
-            // ignorar silenciosamente — el mensaje ya no existe o no cambió
-            return;
-        }
-        throw e;
-    }
 }
 
 // ==================== HANDLER_START ====================
@@ -214,14 +141,12 @@ bot.command('autor', async (ctx) => {
     
     limpiarSesion(usuarioId);
     
-    // FIX: token para evitar race condition entre búsquedas consecutivas rápidas
     const token = Date.now();
     pendientes.set(usuarioId, token);
     
     const autorNormalizado = query;
     console.log(`🔍 /autor: "${autorNormalizado}"`);
     
-    // Verificar caché en disco
     let librosCache = await obtenerLibrosPorAutor(autorNormalizado);
     
     if (librosCache && librosCache.length > 0) {
@@ -233,7 +158,6 @@ bot.command('autor', async (ctx) => {
         return;
     }
     
-    // FIX: feedback visual mientras se busca
     let msgCarga;
     try {
         msgCarga = await ctx.reply('🔍 Buscando libros...');
@@ -246,7 +170,6 @@ bot.command('autor', async (ctx) => {
         }
     };
     
-    // Buscar en Open Library — acumular hasta 300 libros para paginación completa
     try {
         const MAX_LIBROS = 300;
         let idioma = 'es';
@@ -261,7 +184,6 @@ bot.command('autor', async (ctx) => {
             idioma = 'en';
         }
 
-        // Si hay más páginas en la API, seguir pidiendo hasta MAX_LIBROS
         if (libros.length > 0 && totalEncontrados > libros.length) {
             let paginaApi = 1;
             while (libros.length < MAX_LIBROS && libros.length < totalEncontrados && paginaApi < 20) {
@@ -291,7 +213,6 @@ bot.command('autor', async (ctx) => {
         console.error(`❌ Error Open Library: ${error.message}`);
     }
     
-    // Fallback a Gutendex
     try {
         let libros = await buscarPorAutorGutendex(autorNormalizado, 'es');
         if (libros.length === 0) libros = await buscarPorAutorGutendex(autorNormalizado, 'en');
@@ -332,7 +253,6 @@ bot.command('titulo', async (ctx) => {
     
     limpiarSesion(usuarioId);
     
-    // FIX: token para evitar race condition
     const token = Date.now();
     pendientes.set(usuarioId, token);
     
@@ -340,7 +260,6 @@ bot.command('titulo', async (ctx) => {
     const tituloNormalizado = normalizarTexto(tituloOriginal);
     console.log(`🔍 /titulo: "${tituloOriginal}" → normalizado: "${tituloNormalizado}"`);
     
-    // Verificar caché en disco
     let librosCache = await obtenerLibrosPorAutor(`titulo_${tituloNormalizado}`);
     
     if (librosCache && librosCache.length > 0) {
@@ -352,7 +271,6 @@ bot.command('titulo', async (ctx) => {
         return;
     }
     
-    // FIX: feedback visual mientras se busca
     let msgCarga;
     try {
         msgCarga = await ctx.reply('🔍 Buscando título exacto...');
@@ -367,7 +285,6 @@ bot.command('titulo', async (ctx) => {
     
     let libros = [];
     
-    // Buscar en Open Library (SOLO TÍTULO EXACTO)
     try {
         libros = await buscarPorTitulo(tituloNormalizado, 'es');
         if (libros.length === 0) libros = await buscarPorTitulo(tituloNormalizado, 'en');
@@ -386,13 +303,10 @@ bot.command('titulo', async (ctx) => {
         console.error(`❌ Error Open Library: ${error.message}`);
     }
     
-    // Si no hay coincidencia exacta, NO buscar automáticamente.
-    // Mostrar mensaje de confirmación con palabra clave.
     await borrarCarga();
     
     const palabraClave = extraerPalabrasClave(tituloNormalizado, 'simple');
     
-    // Guardar estado temporal para los callbacks
     guardarSesion(usuarioId, 'pendiente_confirmacion', tituloNormalizado, {
         tituloOriginal: tituloOriginal,
         palabraClave: palabraClave,
@@ -417,7 +331,6 @@ bot.command('titulo', async (ctx) => {
 });
 
 // ==================== CALLBACK_MAS_AUTOR ====================
-// FIX: callback_data simplificado — solo lleva el número de página, la query viene de la sesión
 bot.action(/^mas_autor_(\d+)$/, async (ctx) => {
     const paginaActual = parseInt(ctx.match[1]);
     const usuarioId = ctx.from.id;
@@ -450,7 +363,6 @@ bot.action(/^mas_autor_(\d+)$/, async (ctx) => {
 });
 
 // ==================== CALLBACK_MAS_TITULO ====================
-// FIX: callback_data simplificado — solo lleva el número de página, la query viene de la sesión
 bot.action(/^mas_titulo_(\d+)$/, async (ctx) => {
     const paginaActual = parseInt(ctx.match[1]);
     const usuarioId = ctx.from.id;
@@ -503,7 +415,6 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
     
     const libro = sesion.libros[indice];
 
-    // FIX: protección ante retorno inesperado de formatearLibroUnicoConBotones
     const resultado = formatearLibroUnicoConBotones(libro, false);
     const mensaje = typeof resultado === 'string' ? resultado : resultado?.mensaje;
 
@@ -532,17 +443,14 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     
     await ctx.answerCbQuery();
     
-    // Mensaje de transición
     await ctx.reply(
         `Perfecto. Ahora busco libros que contengan "${palabraClave}" en el título.\n\n` +
         `No es exactamente lo que pediste, pero puede que encuentres algo parecido.\n\n` +
         `Acá van los resultados:`
     );
     
-    // Limpiar sesión anterior
     limpiarSesion(usuarioId);
     
-    // FIX: feedback visual mientras se busca
     let msgCarga;
     try {
         msgCarga = await ctx.reply('🔍 Buscando por palabra clave...');
@@ -558,7 +466,6 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     let libros = [];
     let prefijo = `📌 Resultados para "${palabraClave}" (búsqueda por palabra clave):\n\n`;
     
-    // Buscar en Open Library por palabra clave
     try {
         libros = await buscarPorTitulo(palabraClave, 'es');
         if (libros.length === 0) libros = await buscarPorTitulo(palabraClave, 'en');
@@ -577,7 +484,6 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
         console.error(`❌ Error Open Library (palabra clave): ${error.message}`);
     }
     
-    // Fallback a Gutendex
     try {
         console.log(`🔄 Intentando Gutendex para palabra clave: "${palabraClave}"`);
         let librosGutendex = await buscarPorTituloGutendex(palabraClave, 'es');
@@ -608,11 +514,7 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
 // ==================== CALLBACK_CANCELAR_TITULO ====================
 bot.action('cancelar_titulo_palabra_clave', async (ctx) => {
     const usuarioId = ctx.from.id;
-    const sesion = obtenerSesion(usuarioId);
-    
-    // Limpiar sesión de confirmación
     limpiarSesion(usuarioId);
-    
     await ctx.answerCbQuery();
     
     const mensajeCancelacion = 
