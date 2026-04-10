@@ -602,9 +602,11 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     
     await borrarCarga();
     await ctx.reply(
-        `📚 Tampoco encontré libros con la palabra "${palabraClave}".\n\n` +
-        `📘 Posibles razones:\n- El libro no está en dominio público\n- El título tiene otra edición\n\n` +
-        `🔍 Sugerencias:\n- Usa /autor si conoces el autor\n- Prueba con otra palabra clave`
+        `🕯️ Silencio también en los pasillos cercanos... ni rastro de "${palabraClave}".\n\n` +
+        `A veces ocurre. Puede que el libro aún no sea de todos (dominio público), o que use otro nombre en esta biblioteca.\n\n` +
+        `Si sabes quién lo escribió, prueba con /autor Nombre.\n` +
+        `O si quieres, volvemos a intentarlo con otra palabra.\n\n` +
+        `Estoy aquí, entre el polvo y la tinta.`
     );
 });
 
