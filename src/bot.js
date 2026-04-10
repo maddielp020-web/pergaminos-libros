@@ -133,7 +133,7 @@ function formatearMensajeAutor(autor, libros, offset, totalLibros) {
 
 function formatearMensajeTitulo(titulo, libros, offset, totalLibros, prefijo = '') {
     const librosPagina = libros.slice(offset, offset + 5);
-    let mensaje = prefijo + `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
+    let mensaje = prefijo + `\n\n`;
     mensaje += `(${totalLibros} libros encontrados)\n\n`;
     
     librosPagina.forEach((libro, idx) => {
