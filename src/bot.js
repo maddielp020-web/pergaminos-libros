@@ -313,16 +313,18 @@ bot.command('titulo', async (ctx) => {
         token: token
     }, 1);
     
+    // ==================== BLOQUE 1: MENSAJE DE NO RESULTADO EXACTO ====================
     const mensajeConfirmacion = 
-        `📖 Lamentablemente, no encontré "${tituloOriginal}" tal cual lo solicitaste.\n\n` +
-        `Las bibliotecas que consulto no tienen ese título exacto. No es culpa mía, pero tampoco de ellas. Simplemente no está así.\n\n` +
-        `¿Te ayudo a buscar libros que tengan la palabra "${palabraClave}" en el título?`;
+        `🕯️ He revisado los estantes altos y bajos... y no encuentro un ejemplar exacto de "${tituloOriginal}".\n\n` +
+        `A veces los títulos viajan con erratas, o duermen con otro nombre en los registros antiguos.\n\n` +
+        `¿Quieres que busque entre los lomos cercanos? Podría encontrar algo con la palabra "${palabraClave}".`;
     
+    // ==================== BLOQUE 2: BOTONES ====================
     const tecladoConfirmacion = {
         reply_markup: {
             inline_keyboard: [
-                [{ text: '🔍 Sí, búscame relacionados', callback_data: `confirmar_titulo_palabra_clave` }],
-                [{ text: '❌ No, mejor lo dejo', callback_data: `cancelar_titulo_palabra_clave` }]
+                [{ text: '🔍 Sí, busca entre los lomos cercanos', callback_data: `confirmar_titulo_palabra_clave` }],
+                [{ text: '🕯️ No, gracias. Volveré a mirar yo.', callback_data: `cancelar_titulo_palabra_clave` }]
             ]
         }
     };
@@ -443,10 +445,11 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     
     await ctx.answerCbQuery();
     
+    // ==================== BLOQUE 3: CONFIRMACIÓN DE BÚSQUEDA RELACIONADA ====================
     await ctx.reply(
-        `Perfecto. Ahora busco libros que contengan "${palabraClave}" en el título.\n\n` +
-        `No es exactamente lo que pediste, pero puede que encuentres algo parecido.\n\n` +
-        `Acá van los resultados:`
+        `🕯️ Me adentro en los pasillos de títulos parecidos...\n\n` +
+        `Buscaré todo lo que contenga "${palabraClave}". A veces los tesoros están mal etiquetados.\n\n` +
+        `Aquí va lo que encontré:`
     );
     
     limpiarSesion(usuarioId);
@@ -464,7 +467,11 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     };
     
     let libros = [];
-    let prefijo = `📌 Resultados para "${palabraClave}" (búsqueda por palabra clave):\n\n`;
+    
+    // ==================== BLOQUE 4: CABECERA DE RESULTADOS RELACIONADOS ====================
+    // El prefijo se usará dentro de formatearMensajeTitulo
+    // La variable {cantidad} se insertará dinámicamente al formatear el mensaje
+    let prefijo = ``; // Vacío porque el nuevo texto se manejará dentro del bloque
     
     try {
         libros = await buscarPorTitulo(palabraClave, 'es');
@@ -473,7 +480,15 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
         if (libros.length > 0) {
             const tituloClave = `titulo_${normalizarTexto(palabraClave)}`;
             await guardarLibrosPorAutor(tituloClave, libros);
-            const mensaje = formatearMensajeTitulo(palabraClave, libros, 0, libros.length, prefijo);
+            
+            // Construir el mensaje completo con el nuevo formato de cabecera
+            const cantidad = libros.length;
+            const cabecera = `📚 Encontré ${cantidad} libros con "${palabraClave}" en el título.\n\n` +
+                `(No son exactos, pero algo de su esencia comparten).\n\n` +
+                `📖 Si ves el mismo título repetido, fíjate en el autor y el año. Ahí vive la diferencia. La elección es tuya.\n\n` +
+                `👇 Toca el número del que quieras abrir:\n\n`;
+            
+            const mensaje = cabecera + formatearMensajeTitulo(palabraClave, libros, 0, libros.length, '');
             const teclado = crearTeclado(libros.slice(0, 5), 0, libros.length, palabraClave, 0, 'titulo');
             guardarSesion(usuarioId, 'titulo', normalizarTexto(palabraClave), libros, libros.length);
             await borrarCarga();
@@ -492,7 +507,14 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
         if (librosGutendex.length > 0) {
             const tituloClave = `titulo_${normalizarTexto(palabraClave)}`;
             await guardarLibrosPorAutor(tituloClave, librosGutendex);
-            const mensaje = formatearMensajeTitulo(palabraClave, librosGutendex, 0, librosGutendex.length, '📚 BÚSQUEDA POR PALABRA CLAVE (Gutendex):\n\n');
+            
+            const cantidad = librosGutendex.length;
+            const cabecera = `📚 Encontré ${cantidad} libros con "${palabraClave}" en el título.\n\n` +
+                `(No son exactos, pero algo de su esencia comparten).\n\n` +
+                `📖 Si ves el mismo título repetido, fíjate en el autor y el año. Ahí vive la diferencia. La elección es tuya.\n\n` +
+                `👇 Toca el número del que quieras abrir:\n\n`;
+            
+            const mensaje = cabecera + formatearMensajeTitulo(palabraClave, librosGutendex, 0, librosGutendex.length, '');
             const teclado = crearTeclado(librosGutendex.slice(0, 5), 0, librosGutendex.length, palabraClave, 0, 'titulo');
             guardarSesion(usuarioId, 'titulo', normalizarTexto(palabraClave), librosGutendex, librosGutendex.length);
             await borrarCarga();
@@ -504,10 +526,14 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
     }
     
     await borrarCarga();
+    
+    // ==================== BLOQUE 5: NO HAY RESULTADOS RELACIONADOS ====================
     await ctx.reply(
-        `📚 Tampoco encontré libros con la palabra "${palabraClave}".\n\n` +
-        `📘 Posibles razones:\n- El libro no está en dominio público\n- El título tiene otra edición\n\n` +
-        `🔍 Sugerencias:\n- Usa /autor si conoces el autor\n- Prueba con otra palabra clave`
+        `🕯️ Silencio también en los pasillos cercanos... ni rastro de "${palabraClave}".\n\n` +
+        `A veces ocurre. Puede que el libro aún no sea de todos (dominio público), o que use otro nombre en esta biblioteca.\n\n` +
+        `Si sabes quién lo escribió, prueba con /autor Nombre.\n` +
+        `O si quieres, volvemos a intentarlo con otra palabra.\n\n` +
+        `Estoy aquí, entre el polvo y la tinta.`
     );
 });
 
@@ -517,14 +543,14 @@ bot.action('cancelar_titulo_palabra_clave', async (ctx) => {
     limpiarSesion(usuarioId);
     await ctx.answerCbQuery();
     
+    // ==================== BLOQUE 6: USUARIO RECHAZA BÚSQUEDA RELACIONADA ====================
     const mensajeCancelacion = 
-        `Entiendo. No pasa nada.\n\n` +
-        `Podemos intentar de otras maneras:\n\n` +
-        `📘 Con /autor si sabes quién lo escribió\n` +
-        `📘 Con /titulo pero con palabras más cortas\n` +
-        `📘 Revisando bien la ortografía del título\n\n` +
-        `Cuando quieras, escribí /ayuda y te guío.\n\n` +
-        `Aquí estoy para lo que necesites. 🙏`;
+        `🕯️ Sin prisa. No siempre encontramos el libro a la primera.\n\n` +
+        `Si quieres, podemos intentarlo de nuevo:\n` +
+        `- Dime el autor con /autor Nombre\n` +
+        `- O acortemos la búsqueda con menos palabras en /titulo\n\n` +
+        `Si ya estás completamente perdido entre tanto estante, escribe /ayuda_extendida. Te enviaré una guía más detallada a tu privado (si tú me lo permites).\n\n` +
+        `Aquí sigo, custodiando lo eterno. 🙏`;
     
     await ctx.reply(mensajeCancelacion);
 });
