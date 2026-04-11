@@ -56,8 +56,7 @@ function formatearMensajeAutor(autor, libros, offset, totalLibros) {
 // ==================== FORMATEAR_MENSAJE_TITULO ====================
 function formatearMensajeTitulo(titulo, libros, offset, totalLibros, prefijo = '') {
     const librosPagina = libros.slice(offset, offset + 5);
-    let mensaje = prefijo + `📚 BÚSQUEDA POR TÍTULO: "${titulo}"\n\n`;
-    mensaje += `(${totalLibros} libros encontrados)\n\n`;
+    let mensaje = prefijo;
     
     librosPagina.forEach((libro, idx) => {
         const numero = offset + idx + 1;
@@ -65,8 +64,7 @@ function formatearMensajeTitulo(titulo, libros, offset, totalLibros, prefijo = '
         mensaje += `${numero}. ${libro.titulo} - ${libro.autor}${año}\n`;
     });
     
-    mensaje += `\n📖 Si ves el mismo título varias veces, mirá el autor y el año. Ahí está la diferencia. La elección es tuya. Es un placer ayudarte.\n`;
-    mensaje += `\n👇 Toca el número del libro que quieres ver`;
+    // NO agregar nada más. El prefijo ya contiene todo (encabezado, explicación, instrucción final)
     return mensaje;
 }
 
