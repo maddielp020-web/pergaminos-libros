@@ -256,15 +256,14 @@ bot.command('autor', async (ctx) => {
     } catch (error) {
         console.error(`❌ Error Gutendex: ${error.message}`);
     }
-    
     await borrarCarga();
-await ctx.reply(
-    `🕯️ He recorrido todos los pasillos, he mirado en cada estante... y no encuentro nada para "${query}".\n\n` +
-    `A veces los libros duermen en otras bibliotecas, o aún no han llegado a ser de todos.\n\n` +
-    `Si sabes quién lo escribió, prueba con /autor Nombre.\n` +
-    `O si quieres, volvemos a intentarlo con otra palabra.\n\n` +
-    `Estoy aquí, entre el polvo y la tinta.`
-);
+    await ctx.reply(
+        `🕯️ He recorrido todos los pasillos, he mirado en cada estante... y no encuentro nada para "${query}".\n\n` +
+        `A veces los libros duermen en otras bibliotecas, o aún no han llegado a ser de todos.\n\n` +
+        `Si sabes quién lo escribió, prueba con /autor Nombre.\n` +
+        `O si quieres, volvemos a intentarlo con otra palabra.\n\n` +
+        `Estoy aquí, entre el polvo y la tinta.`
+    );
 }
 
 // ==================== HANDLER_TITULO ====================
