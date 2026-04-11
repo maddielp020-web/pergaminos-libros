@@ -481,14 +481,18 @@ bot.action('confirmar_titulo_palabra_clave', async (ctx) => {
             const tituloClave = `titulo_${normalizarTexto(palabraClave)}`;
             await guardarLibrosPorAutor(tituloClave, libros);
             
-            // Construir el mensaje completo con el nuevo formato de cabecera
+            // Construir el mensaje completo con el orden correcto: encabezado -> lista -> explicación -> advertencia -> instrucción
             const cantidad = libros.length;
-            const cabecera = `📚 Encontré ${cantidad} libros con "${palabraClave}" en el título.\n\n` +
-                `(No son exactos, pero algo de su esencia comparten).\n\n` +
-                `📖 Si ves el mismo título repetido, fíjate en el autor y el año. Ahí vive la diferencia. La elección es tuya.\n\n` +
-                `👇 Toca el número del que quieras abrir:\n\n`;
+            const encabezado = `📚 Encontré ${cantidad} libros con "${palabraClave}" en el título.\n\n`;
             
-            const mensaje = cabecera + formatearMensajeTitulo(palabraClave, libros, 0, libros.length, '');
+            // Obtener SOLO la lista de libros (sin nada extra)
+            const soloLista = formatearMensajeTitulo(palabraClave, libros, 0, libros.length, '');
+            
+            const pie = `\n(No son exactos, pero algo de su esencia comparten).\n\n` +
+                `📖 Si ves el mismo título repetido, fíjate en el autor y el año. Ahí vive la diferencia. La elección es tuya.\n\n` +
+                `👇 Toca el número del que quieras abrir:`;
+            
+            const mensaje = encabezado + soloLista + pie;
             const teclado = crearTeclado(libros.slice(0, 5), 0, libros.length, palabraClave, 0, 'titulo');
             guardarSesion(usuarioId, 'titulo', normalizarTexto(palabraClave), libros, libros.length);
             await borrarCarga();
