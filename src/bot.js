@@ -91,6 +91,32 @@ function extraerPalabrasClave(frase, modo = 'simple') {
     return palabras.slice(0, 3).join(' ');
 }
 
+// ==================== CONTROL_ACCESO_PRIVADO ====================
+// Middleware para controlar acceso en mensajes privados
+bot.use(async (ctx, next) => {
+    // Si no es un mensaje privado, continuar normalmente
+    if (ctx.chat && ctx.chat.type !== 'private') {
+        return next();
+    }
+    
+    // Si es privado y el ID NO es el creador
+    if (ctx.from && ctx.from.id !== ID_CREADOR) {
+        const mensajeRedireccion = 
+            `📖 El bibliotecario alza la vista del mostrador.\n\n` +
+            `Trabajo dentro del grupo PergaminosAbiertos. Allí, entre los estantes, puedo buscar los libros que necesitas.\n\n` +
+            `🏛️ Únete al grupo y escríbeme allí:\n` +
+            `🔗 https://t.me/+bCKN6JnABA8xZGM6\n\n` +
+            `Allí también te espera el guardián @PergaminosAdmin_Bot por si necesitas ayuda.\n\n` +
+            `🕯️ Lo eterno. Lo libre. Lo de todos.`;
+        
+        await ctx.reply(mensajeRedireccion);
+        return; // No continuar a otros handlers
+    }
+    
+    // Si es el creador, continuar normalmente
+    return next();
+});
+
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
     limpiarSesion(ctx.from.id);
