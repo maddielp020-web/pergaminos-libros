@@ -265,6 +265,7 @@ await ctx.reply(
     `O si quieres, volvemos a intentarlo con otra palabra.\n\n` +
     `Estoy aquí, entre el polvo y la tinta.`
 );
+}
 
 // ==================== HANDLER_TITULO ====================
 bot.command('titulo', async (ctx) => {
