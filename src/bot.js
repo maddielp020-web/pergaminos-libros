@@ -364,9 +364,17 @@ bot.action(/^mas_autor_(\d+)$/, async (ctx) => {
     const usuarioId = ctx.from.id;
     const sesion = obtenerSesion(usuarioId);
     
+    // Verificar si el usuario es el dueño de la sesión
     if (!sesion || sesion.tipo !== 'autor') {
         await ctx.answerCbQuery('Sesión expirada');
-        await ctx.reply('❓ Primero buscá al autor con: /autor [nombre]');
+        await ctx.reply(
+            `🕯️ Ese listado pertenece a otro lector que pasó antes por aquí.\n\n` +
+            `Los botones solo responden a quien hizo la búsqueda original. Es como querer leer un libro que otro sacó del estante y aún no ha devuelto.\n\n` +
+            `Para abrir tu propia puerta, prueba con:\n` +
+            `/autor Nombre\n` +
+            `/titulo Título\n\n` +
+            `Es rápido. Y el libro será solo tuyo.`
+        );
         return;
     }
     
@@ -389,16 +397,24 @@ bot.action(/^mas_autor_(\d+)$/, async (ctx) => {
     await ctx.answerCbQuery(`Página ${paginaActual + 1}`);
     await editarMensajeSeguro(ctx, mensaje, teclado);
 });
-
+    
 // ==================== CALLBACK_MAS_TITULO ====================
 bot.action(/^mas_titulo_(\d+)$/, async (ctx) => {
     const paginaActual = parseInt(ctx.match[1]);
     const usuarioId = ctx.from.id;
     const sesion = obtenerSesion(usuarioId);
     
+    // Verificar si el usuario es el dueño de la sesión
     if (!sesion || sesion.tipo !== 'titulo') {
         await ctx.answerCbQuery('Sesión expirada');
-        await ctx.reply('❓ Primero buscá el título con: /titulo [nombre]');
+        await ctx.reply(
+            `🕯️ Ese listado pertenece a otro lector que pasó antes por aquí.\n\n` +
+            `Los botones solo responden a quien hizo la búsqueda original. Es como querer leer un libro que otro sacó del estante y aún no ha devuelto.\n\n` +
+            `Para abrir tu propia puerta, prueba con:\n` +
+            `/autor Nombre\n` +
+            `/titulo Título\n\n` +
+            `Es rápido. Y el libro será solo tuyo.`
+        );
         return;
     }
     
@@ -429,9 +445,17 @@ bot.action(/^libro_(\d+)$/, async (ctx) => {
     const usuarioId = ctx.from.id;
     const sesion = obtenerSesion(usuarioId);
     
+    // Verificar si el usuario es el dueño de la sesión
     if (!sesion) {
         await ctx.answerCbQuery('Sesión expirada');
-        await ctx.reply('❓ Primero buscá con /autor o /titulo');
+        await ctx.reply(
+            `🕯️ Ese listado pertenece a otro lector que pasó antes por aquí.\n\n` +
+            `Los botones solo responden a quien hizo la búsqueda original. Es como querer leer un libro que otro sacó del estante y aún no ha devuelto.\n\n` +
+            `Para abrir tu propia puerta, prueba con:\n` +
+            `/autor Nombre\n` +
+            `/titulo Título\n\n` +
+            `Es rápido. Y el libro será solo tuyo.`
+        );
         return;
     }
     
